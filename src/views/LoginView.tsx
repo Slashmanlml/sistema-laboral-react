@@ -1,0 +1,139 @@
+import React, { useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { Sprout, Lock, Mail, AlertCircle, Eye, EyeOff } from 'lucide-react';
+
+interface LoginViewProps {
+  onLoginSuccess?: () => void;
+}
+
+export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (authError) throw authError;
+
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      }
+    } catch (err: unknown) {
+      console.error("Error de autenticación:", err);
+      const errorMsg = err instanceof Error ? err.message : 'Ocurrió un error al iniciar sesión.';
+      // Traducir mensajes comunes de Supabase
+      if (errorMsg === 'Invalid login credentials') {
+        setError('Correo electrónico o contraseña incorrectos.');
+      } else {
+        setError(errorMsg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col justify-center items-center p-6 font-sans relative overflow-hidden select-none">
+      {/* Decorative background glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-green-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div className="w-full max-w-md bg-gray-900/40 backdrop-blur-xl border border-gray-800/80 p-8 rounded-3xl shadow-2xl relative z-10 space-y-6">
+        
+        {/* Header / Logo */}
+        <div className="text-center space-y-3">
+          <div className="w-14 h-14 bg-green-500/10 text-green-400 border border-green-500/20 rounded-2xl flex items-center justify-center mx-auto shadow-md shadow-green-950/20">
+            <Sprout size={32} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-white tracking-tight">GrowManager</h2>
+            <p className="text-sm text-gray-400 mt-1">Inicia sesión para gestionar tus cultivos</p>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl flex items-start gap-2.5">
+            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Formulario */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Correo Electrónico</label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
+                <Mail size={18} />
+              </span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-gray-950/70 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-green-500/80 text-sm transition duration-200"
+                placeholder="ejemplo@correo.com"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Contraseña</label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-500">
+                <Lock size={18} />
+              </span>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-11 pr-11 py-3 bg-gray-950/70 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-green-500/80 text-sm transition duration-200"
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-500 hover:text-gray-300 transition"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 bg-green-500 hover:bg-green-600 disabled:bg-green-500/50 disabled:cursor-not-allowed text-gray-950 font-bold rounded-xl shadow-lg shadow-green-950/20 transition duration-200 flex items-center justify-center text-sm"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-gray-950 border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              'Ingresar al Panel'
+            )}
+          </button>
+        </form>
+
+        {/* Footer info */}
+        <div className="text-center">
+          <p className="text-xs text-gray-600 leading-relaxed">
+            GrowManager utiliza encriptación SSL de extremo a extremo. Los datos de tus salas de cultivo se guardan de forma privada.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};

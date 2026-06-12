@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './views/DashboardView';
@@ -6,11 +6,47 @@ import { LotsView } from './views/LotsView';
 import { LogsView } from './views/LogsView';
 import { TasksView } from './views/TasksView';
 import { SettingsView } from './views/SettingsView';
+import { LoginView } from './views/LoginView';
 import { GrowProvider } from './context/GrowContext';
 import { Menu, Sprout } from 'lucide-react';
+import { supabase } from './lib/supabaseClient';
+import type { Session } from '@supabase/supabase-js';
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    // Obtener sesión inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    // Escuchar cambios de estado de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen bg-gray-950 text-gray-100 items-center justify-center font-sans select-none">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-gray-500 text-sm animate-pulse">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <LoginView />;
+  }
 
   return (
     <GrowProvider>

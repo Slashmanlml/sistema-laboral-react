@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Box, Thermometer, CalendarCheck, Settings, Sprout, X } from 'lucide-react';
+import { LayoutDashboard, Box, Thermometer, CalendarCheck, Settings, Sprout, X, LogOut } from 'lucide-react';
 import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed } from '../utils/calculations';
+import { supabase } from '../lib/supabaseClient';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -57,19 +58,34 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           <NavItem to="/settings" active={location.pathname === '/settings'} icon={<Settings size={20}/>} label="Ajustes" onClick={onClose} />
         </nav>
 
-        {/* Widget de Lote Activo en el Sidebar */}
-        {latestLot && (
-          <div className="mt-auto p-4 bg-gray-900/50 border border-gray-800/80 rounded-2xl">
-            <div className="flex items-center gap-2 mb-2 text-xs text-green-400 font-medium">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              Lote Activo
+        {/* Bottom Section */}
+        <div className="mt-auto space-y-4">
+          {latestLot && (
+            <div className="p-4 bg-gray-900/50 border border-gray-800/80 rounded-2xl">
+              <div className="flex items-center gap-2 mb-2 text-xs text-green-400 font-medium">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                Lote Activo
+              </div>
+              <h4 className="text-sm font-semibold text-white truncate">{latestLot.name}</h4>
+              <p className="text-xs text-gray-400 mt-1 truncate">
+                {latestLot.strain} • {latestLot.stage} (Día {calculateDaysElapsed(latestLot.start_date)})
+              </p>
             </div>
-            <h4 className="text-sm font-semibold text-white truncate">{latestLot.name}</h4>
-            <p className="text-xs text-gray-400 mt-1 truncate">
-              {latestLot.strain} • {latestLot.stage} (Día {calculateDaysElapsed(latestLot.start_date)})
-            </p>
+          )}
+
+          <div className="border-t border-gray-900/60 pt-4">
+            <button 
+              onClick={async () => {
+                onClose();
+                await supabase.auth.signOut();
+              }}
+              className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/5 border border-transparent hover:border-red-500/10 transition duration-200"
+            >
+              <LogOut size={20} />
+              <span>Cerrar Sesión</span>
+            </button>
           </div>
-        )}
+        </div>
       </aside>
     </>
   );
