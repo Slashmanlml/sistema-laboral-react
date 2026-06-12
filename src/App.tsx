@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { DashboardView } from './views/DashboardView';
@@ -6,22 +7,44 @@ import { LogsView } from './views/LogsView';
 import { TasksView } from './views/TasksView';
 import { SettingsView } from './views/SettingsView';
 import { GrowProvider } from './context/GrowContext';
+import { Menu, Sprout } from 'lucide-react';
 
 function App() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <GrowProvider>
       <BrowserRouter>
-        <div className="flex min-h-screen bg-gray-900 text-gray-100 font-sans">
-          <Sidebar />
-          <main className="flex-1 p-8 overflow-y-auto">
-            <Routes>
-              <Route path="/" element={<DashboardView />} />
-              <Route path="/lots" element={<LotsView />} />
-              <Route path="/logs" element={<LogsView />} />
-              <Route path="/tasks" element={<TasksView />} />
-              <Route path="/settings" element={<SettingsView />} />
-            </Routes>
-          </main>
+        <div className="flex min-h-screen bg-gray-900 text-gray-100 font-sans relative overflow-x-hidden">
+          <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+          
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Top Bar for Mobile */}
+            <header className="flex md:hidden items-center justify-between px-6 py-4 bg-gray-950 border-b border-gray-800 sticky top-0 z-40">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-500/10 rounded-xl text-green-400 border border-green-500/20">
+                  <Sprout size={20} />
+                </div>
+                <span className="font-bold text-lg text-white">GrowManager</span>
+              </div>
+              <button 
+                onClick={() => setSidebarOpen(true)}
+                className="p-2 hover:bg-gray-900 rounded-xl text-gray-400 hover:text-white transition"
+              >
+                <Menu size={24} />
+              </button>
+            </header>
+
+            <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+              <Routes>
+                <Route path="/" element={<DashboardView />} />
+                <Route path="/lots" element={<LotsView />} />
+                <Route path="/logs" element={<LogsView />} />
+                <Route path="/tasks" element={<TasksView />} />
+                <Route path="/settings" element={<SettingsView />} />
+              </Routes>
+            </main>
+          </div>
         </div>
       </BrowserRouter>
     </GrowProvider>
