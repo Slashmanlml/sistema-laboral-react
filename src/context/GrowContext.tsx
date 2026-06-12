@@ -5,10 +5,11 @@ import { calculateVPD } from '../utils/calculations';
 import { supabase } from '../lib/supabaseClient';
 
 const getSeeds = () => {
+  const suffix = Math.random().toString(36).substring(2, 9) + '_' + Date.now();
   const initialStrains: Strain[] = [
-    { id: '1', name: 'Moby Dick', type: 'Sativa' },
-    { id: '2', name: 'Gorilla Glue #4', type: 'Híbrido' },
-    { id: '3', name: 'Gelato #33', type: 'Híbrido' }
+    { id: `strain_${suffix}_1`, name: 'Moby Dick', type: 'Sativa' },
+    { id: `strain_${suffix}_2`, name: 'Gorilla Glue #4', type: 'Híbrido' },
+    { id: `strain_${suffix}_3`, name: 'Gelato #33', type: 'Híbrido' }
   ];
 
   const today = new Date();
@@ -18,9 +19,12 @@ const getSeeds = () => {
   const tomorrowStr = new Date(today.getTime() + (24 * 60 * 60 * 1000)).toISOString().split('T')[0];
   const yesterdayStr = new Date(today.getTime() - (24 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
+  const lot1Id = `lot_${suffix}_1`;
+  const lot2Id = `lot_${suffix}_2`;
+
   const initialLots: Lot[] = [
     {
-      id: 'lot_1',
+      id: lot1Id,
       name: 'Carpa Vegetativo - Domo 1',
       strain: 'Moby Dick',
       plant_count: 4,
@@ -30,7 +34,7 @@ const getSeeds = () => {
       is_archived: false
     },
     {
-      id: 'lot_2',
+      id: lot2Id,
       name: 'Sala Flora Principal',
       strain: 'Gorilla Glue #4',
       plant_count: 8,
@@ -49,8 +53,8 @@ const getSeeds = () => {
     const vpd = calculateVPD(temp, humidity);
     
     initialLogs.push({
-      id: `log_seed_${i}`,
-      lot_id: 'lot_2',
+      id: `log_${suffix}_${i}`,
+      lot_id: lot2Id,
       date: logTime.toISOString(),
       temp,
       humidity,
@@ -63,9 +67,9 @@ const getSeeds = () => {
   }
 
   const initialTasks: Task[] = [
-    { id: 'task_1', lot_id: 'lot_2', title: 'Riego con Nutrientes Flora', date: todayStr, type: 'fertilizante', notes: 'Diluir 2ml/L FloraBloom en agua desclorada.', is_completed: false },
-    { id: 'task_2', lot_id: 'lot_1', title: 'Aplicación Preventiva de Neem', date: yesterdayStr, type: 'preventivo', notes: 'Pulverizar foliar al apagarse las luces.', is_completed: true },
-    { id: 'task_3', lot_id: 'lot_1', title: 'Defoliación de bajos y poda', date: tomorrowStr, type: 'poda', notes: 'Quitar brotes débiles de la zona baja.', is_completed: false }
+    { id: `task_${suffix}_1`, lot_id: lot2Id, title: 'Riego con Nutrientes Flora', date: todayStr, type: 'fertilizante', notes: 'Diluir 2ml/L FloraBloom en agua desclorada.', is_completed: false },
+    { id: `task_${suffix}_2`, lot_id: lot1Id, title: 'Aplicación Preventiva de Neem', date: yesterdayStr, type: 'preventivo', notes: 'Pulverizar foliar al apagarse las luces.', is_completed: true },
+    { id: `task_${suffix}_3`, lot_id: lot1Id, title: 'Defoliación de bajos y poda', date: tomorrowStr, type: 'poda', notes: 'Quitar brotes débiles de la zona baja.', is_completed: false }
   ];
 
   return { initialStrains, initialLots, initialLogs, initialTasks };

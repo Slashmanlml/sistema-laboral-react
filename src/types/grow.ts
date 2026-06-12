@@ -1,11 +1,13 @@
 export interface Strain {
   id: string;
+  user_id?: string;
   name: string;
   type: 'Híbrido' | 'Índica' | 'Sativa' | 'CBD';
 }
 
 export interface Lot {
   id: string;
+  user_id?: string;
   name: string;
   strain: string;
   plant_count: number;
@@ -17,6 +19,7 @@ export interface Lot {
 
 export interface Log {
   id: string;
+  user_id?: string;
   lot_id: string;
   date: string;
   temp: number;
@@ -30,6 +33,7 @@ export interface Log {
 
 export interface Task {
   id: string;
+  user_id?: string;
   lot_id: string;
   title: string;
   date: string;
@@ -37,3 +41,4 @@ export interface Task {
   notes?: string;
   is_completed: boolean;
 }
+

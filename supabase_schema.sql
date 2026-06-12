@@ -1,11 +1,12 @@
 -- ==========================================
--- SCRIPT DE BASE DE DATOS PARA GROWMANAGER
--- Pegar esto en el "SQL Editor" de Supabase
+-- SCRIPT DE BASE DE DATOS PARA GROWMANAGER (CON MULTI-USUARIO)
+-- Pegar esto en el "SQL Editor" de Supabase para instalaciones limpias
 -- ==========================================
 
 -- 1. Crear tabla de genéticas (strains)
 create table strains (
   id text primary key,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name text not null,
   type text not null check (type in ('Híbrido', 'Índica', 'Sativa', 'CBD'))
 );
@@ -13,6 +14,7 @@ create table strains (
 -- 2. Crear tabla de lotes (lots)
 create table lots (
   id text primary key,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name text not null,
   strain text not null,
   plant_count integer not null,
@@ -25,6 +27,7 @@ create table lots (
 -- 3. Crear tabla de registros diarios (logs)
 create table logs (
   id text primary key,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   lot_id text not null references lots(id) on delete cascade,
   date timestamp with time zone not null default timezone('utc'::text, now()),
   temp numeric not null,
@@ -39,6 +42,7 @@ create table logs (
 -- 4. Crear tabla de tareas (tasks)
 create table tasks (
   id text primary key,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   lot_id text not null references lots(id) on delete cascade,
   title text not null,
   date date not null,
@@ -47,35 +51,64 @@ create table tasks (
   is_completed boolean not null default false
 );
 
--- ==========================================
--- Habilitar Row Level Security (RLS) y dar acceso público
--- ==========================================
-
+-- Habilitar Row Level Security (RLS)
 alter table strains enable row level security;
 alter table lots enable row level security;
 alter table logs enable row level security;
 alter table tasks enable row level security;
 
--- Políticas públicas (Permiten leer, insertar, actualizar y borrar sin estar logueado)
-create policy "Acceso público strains" on strains for all using (true) with check (true);
-create policy "Acceso público lots" on lots for all using (true) with check (true);
-create policy "Acceso público logs" on logs for all using (true) with check (true);
-create policy "Acceso público tasks" on tasks for all using (true) with check (true);
+-- Políticas de aislamiento privado por usuario
+create policy "Acceso privado strains" on strains for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Acceso privado lots" on lots for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Acceso privado logs" on logs for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Acceso privado tasks" on tasks for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- ==========================================
--- ACTUALIZACIÓN A POLÍTICAS PRIVADAS (AUTH)
--- Pegar esto en el "SQL Editor" para cerrar el acceso público
--- ==========================================
 
--- 1. Eliminar políticas públicas anteriores
--- drop policy "Acceso público strains" on strains;
--- drop policy "Acceso público lots" on lots;
--- drop policy "Acceso público logs" on logs;
--- drop policy "Acceso público tasks" on tasks;
+-- =========================================================================
+-- SCRIPT DE MIGRACIÓN: EJECUTAR ESTO PARA MIGRAR SI YA TIENES DATOS CREADOS
+-- =========================================================================
+/*
+-- 1. Agregar columna user_id a todas las tablas (inicialmente nula)
+alter table strains add column user_id uuid references auth.users(id);
+alter table lots add column user_id uuid references auth.users(id);
+alter table logs add column user_id uuid references auth.users(id);
+alter table tasks add column user_id uuid references auth.users(id);
 
--- 2. Crear políticas privadas restringidas a usuarios autenticados
--- create policy "Acceso privado strains" on strains for all to authenticated using (true) with check (true);
--- create policy "Acceso privado lots" on lots for all to authenticated using (true) with check (true);
--- create policy "Acceso privado logs" on logs for all to authenticated using (true) with check (true);
--- create policy "Acceso privado tasks" on tasks for all to authenticated using (true) with check (true);
+-- 2. Asignar los datos existentes al usuario José (machadiito78@gmail.com)
+-- (El UID corresponde a machadiito78@gmail.com según la consola)
+update strains set user_id = 'c8170021-984c-4be9-93b9-f87e257f33d3' where user_id is null;
+update lots set user_id = 'c8170021-984c-4be9-93b9-f87e257f33d3' where user_id is null;
+update logs set user_id = 'c8170021-984c-4be9-93b9-f87e257f33d3' where user_id is null;
+update tasks set user_id = 'c8170021-984c-4be9-93b9-f87e257f33d3' where user_id is null;
+
+-- 3. Hacer que user_id sea NOT NULL y tenga por defecto auth.uid()
+alter table strains alter column user_id set not null;
+alter table strains alter column user_id set default auth.uid();
+
+alter table lots alter column user_id set not null;
+alter table lots alter column user_id set default auth.uid();
+
+alter table logs alter column user_id set not null;
+alter table logs alter column user_id set default auth.uid();
+
+alter table tasks alter column user_id set not null;
+alter table tasks alter column user_id set default auth.uid();
+
+-- 4. Eliminar políticas antiguas (si las creaste previamente)
+drop policy if exists "Acceso público strains" on strains;
+drop policy if exists "Acceso público lots" on lots;
+drop policy if exists "Acceso público logs" on logs;
+drop policy if exists "Acceso público tasks" on tasks;
+drop policy if exists "Acceso privado strains" on strains;
+drop policy if exists "Acceso privado lots" on lots;
+drop policy if exists "Acceso privado logs" on logs;
+drop policy if exists "Acceso privado tasks" on tasks;
+
+-- 5. Crear políticas de aislamiento por usuario
+create policy "Acceso privado strains" on strains for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Acceso privado lots" on lots for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Acceso privado logs" on logs for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Acceso privado tasks" on tasks for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+*/
+
 
