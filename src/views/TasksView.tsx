@@ -90,20 +90,20 @@ export const TasksView = () => {
   const monthName = currentDate.toLocaleString('es-AR', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto select-none">
+    <div className="space-y-8 max-w-7xl mx-auto select-none text-slate-700">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight">Tareas y Agenda</h2>
-          <p className="text-gray-400 mt-1">Organiza las labores diarias y mantén tus plantas cuidadas.</p>
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Tareas y Agenda</h2>
+          <p className="text-slate-500 mt-1 font-medium font-sans">Organiza las labores diarias y mantén tus plantas cuidadas.</p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           {/* Toggle de vista */}
-          <div className="flex bg-gray-900 border border-gray-800 rounded-xl p-1">
+          <div className="flex bg-slate-100 border border-slate-200 rounded-xl p-1 shadow-sm">
             <button
               onClick={() => setViewMode('calendario')}
               className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                viewMode === 'calendario' ? 'bg-emerald-500 text-gray-950 shadow' : 'text-gray-400 hover:text-white'
+                viewMode === 'calendario' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-555 hover:text-slate-800'
               }`}
               title="Vista de Calendario"
             >
@@ -113,7 +113,7 @@ export const TasksView = () => {
             <button
               onClick={() => setViewMode('lista')}
               className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                viewMode === 'lista' ? 'bg-emerald-500 text-gray-950 shadow' : 'text-gray-400 hover:text-white'
+                viewMode === 'lista' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-555 hover:text-slate-800'
               }`}
               title="Vista de Lista"
             >
@@ -124,7 +124,7 @@ export const TasksView = () => {
 
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-semibold rounded-xl transition duration-200 ml-auto md:ml-0 text-sm"
+            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150 ml-auto md:ml-0 text-sm shadow-sm"
           >
             <Plus size={18} />
             Nueva Tarea
@@ -136,26 +136,26 @@ export const TasksView = () => {
         {/* Formulario de Tarea (colapsable) */}
         {showForm && (
           <div className="lg:col-span-4">
-            <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6 shadow-xl">
-              <h3 className="text-lg font-bold text-white mb-5">Crear Nueva Tarea</h3>
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md animate-in slide-in-from-left duration-200">
+              <h3 className="text-lg font-bold text-slate-900 mb-5">Crear Nueva Tarea</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Título *</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Título *</label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500"
-                    placeholder="Ej: Riego con Fertilizante Veg"
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 shadow-sm"
+                    placeholder="Ej: Riego con Fertilizante Ryanodine"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Lote *</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Cama de Cultivo *</label>
                   <select
                     value={lotId}
                     onChange={(e) => setLotId(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 text-sm"
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                     required
                   >
                     <option value="">Selecciona un lote...</option>
@@ -166,21 +166,21 @@ export const TasksView = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Fecha *</label>
+                    <label className="block text-sm font-semibold text-slate-600 mb-1">Fecha *</label>
                     <input
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
+                    <label className="block text-sm font-semibold text-slate-600 mb-1">Tipo</label>
                     <select
                       value={type}
                       onChange={(e) => setType(e.target.value as Task['type'])}
-                      className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-850 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                     >
                       <option value="riego">Riego</option>
                       <option value="fertilizante">Nutrientes</option>
@@ -191,26 +191,26 @@ export const TasksView = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Instrucciones</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Instrucciones</label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500"
-                    rows={2}
-                    placeholder="Ej: Diluir 2ml/L de sales base."
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 shadow-sm"
+                    rows={3}
+                    placeholder="Ej: Diluir 3.8 ml/L de Makro A y Mikro B."
                   ></textarea>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
-                    className="flex-1 py-2.5 bg-gray-900 hover:bg-gray-800 text-gray-300 font-semibold rounded-xl border border-gray-800 transition"
+                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-200 transition duration-150"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-semibold rounded-xl transition"
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150 shadow-sm"
                   >
                     Agregar Tarea
                   </button>
@@ -225,27 +225,27 @@ export const TasksView = () => {
           {viewMode === 'calendario' ? (
             /* Vista del Calendario Mensual */
             <div className="space-y-6">
-              <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6 shadow-md flex flex-col">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col">
                 {/* Cabecera del Mes */}
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-white capitalize">{monthName}</h3>
-                  <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-xl p-1">
+                  <h3 className="text-xl font-extrabold text-slate-900 capitalize tracking-tight">{monthName}</h3>
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-1 shadow-sm">
                     <button
                       onClick={prevMonth}
-                      className="p-1.5 hover:bg-gray-800 text-gray-400 hover:text-white rounded-lg transition"
+                      className="p-1.5 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded-lg transition"
                       title="Mes Anterior"
                     >
                       <ChevronLeft size={18} />
                     </button>
                     <button
                       onClick={() => setCurrentDate(new Date())}
-                      className="px-3 py-1.5 hover:bg-gray-800 text-xs font-bold text-gray-300 rounded-lg transition"
+                      className="px-3 py-1.5 hover:bg-slate-200 text-xs font-bold text-slate-700 rounded-lg transition"
                     >
                       Hoy
                     </button>
                     <button
                       onClick={nextMonth}
-                      className="p-1.5 hover:bg-gray-800 text-gray-400 hover:text-white rounded-lg transition"
+                      className="p-1.5 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded-lg transition"
                       title="Siguiente Mes"
                     >
                       <ChevronRight size={18} />
@@ -255,9 +255,9 @@ export const TasksView = () => {
 
                 {/* Cuadrícula del Calendario */}
                 <div className="overflow-x-auto">
-                  <div className="grid grid-cols-7 gap-2 min-w-[600px] border-b border-gray-900 pb-2">
+                  <div className="grid grid-cols-7 gap-2 min-w-[600px] border-b border-slate-150 pb-2">
                     {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(day => (
-                      <div key={day} className="text-center text-xs font-bold text-gray-500 uppercase tracking-wider py-1.5">
+                      <div key={day} className="text-center text-xs font-bold text-slate-400 uppercase tracking-wider py-1.5">
                         {day}
                       </div>
                     ))}
@@ -265,7 +265,7 @@ export const TasksView = () => {
                   <div className="grid grid-cols-7 gap-2 min-w-[600px] pt-2">
                     {daysGrid.map((day, idx) => {
                       if (!day) {
-                        return <div key={`empty-${idx}`} className="bg-gray-900/10 border border-gray-900/30 rounded-xl min-h-[90px] opacity-25" />;
+                        return <div key={`empty-${idx}`} className="bg-slate-50/20 border border-slate-100 rounded-xl min-h-[90px] opacity-25" />;
                       }
 
                       const dateStr = day.toISOString().split('T')[0];
@@ -277,23 +277,23 @@ export const TasksView = () => {
                         <div
                           key={dateStr}
                           onClick={() => setSelectedDate(dateStr)}
-                          className={`bg-gray-900/40 border rounded-xl p-2 min-h-[90px] flex flex-col justify-between cursor-pointer transition duration-150 ${
+                          className={`bg-white border rounded-xl p-2 min-h-[95px] flex flex-col justify-between cursor-pointer transition duration-150 ${
                             isSelected
-                              ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20'
+                              ? 'border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500/20 shadow-sm shadow-emerald-500/10'
                               : isToday
-                                ? 'border-gray-700 bg-gray-800/40'
-                                : 'border-gray-900 hover:border-gray-800'
+                                ? 'border-slate-300 bg-slate-50'
+                                : 'border-slate-200 hover:border-slate-300'
                           }`}
                         >
                           <div className="flex justify-between items-center">
                             <span className={`text-xs font-bold ${
-                              isSelected ? 'text-emerald-400' : isToday ? 'text-white' : 'text-gray-500'
+                              isSelected ? 'text-emerald-600' : isToday ? 'text-slate-900 font-extrabold' : 'text-slate-400'
                             }`}>
                               {day.getDate()}
                             </span>
                             {dayTasks.length > 0 && (
                               <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
-                                isSelected ? 'bg-emerald-500 text-gray-950' : 'bg-gray-900 text-gray-400 border border-gray-800'
+                                isSelected ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 border border-slate-200'
                               }`}>
                                 {dayTasks.length}
                               </span>
@@ -304,16 +304,16 @@ export const TasksView = () => {
                           <div className="space-y-1 mt-1.5 flex-1 overflow-y-auto max-h-[50px] pr-0.5 scrollbar-thin">
                             {dayTasks.slice(0, 2).map(task => {
                               const badgeStyle = 
-                                task.type === 'riego' ? 'bg-blue-500/10 text-blue-400 border-blue-500/10' :
-                                task.type === 'fertilizante' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/10' :
-                                task.type === 'poda' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/10' :
-                                task.type === 'preventivo' ? 'bg-red-500/10 text-red-400 border-red-500/10' :
-                                'bg-gray-500/10 text-gray-400 border-gray-500/10';
+                                task.type === 'riego' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                task.type === 'fertilizante' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                task.type === 'poda' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' :
+                                task.type === 'preventivo' ? 'bg-red-50 text-red-650 border border-red-100' :
+                                'bg-slate-50 text-slate-600 border border-slate-100';
 
                               return (
                                 <div
                                   key={task.id}
-                                  className={`text-[9px] truncate px-1 rounded border leading-snug font-semibold ${badgeStyle}`}
+                                  className={`text-[9px] truncate px-1.5 py-0.5 rounded border leading-none font-bold ${badgeStyle}`}
                                   title={task.title}
                                 >
                                   {task.title}
@@ -321,7 +321,7 @@ export const TasksView = () => {
                               );
                             })}
                             {dayTasks.length > 2 && (
-                              <div className="text-[8px] text-gray-500 text-center font-bold">
+                              <div className="text-[8px] text-slate-400 text-center font-bold">
                                 +{dayTasks.length - 2}
                               </div>
                             )}
@@ -334,13 +334,13 @@ export const TasksView = () => {
               </div>
 
               {/* Detalle del Día Seleccionado */}
-              <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6 shadow-md">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <CheckCircle2 className="text-emerald-400" size={18} />
-                  Tareas para el día: <span className="text-emerald-400 font-semibold">{selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : '-'}</span>
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <CheckCircle2 className="text-emerald-600" size={18} />
+                  Tareas para el día: <span className="text-emerald-600 font-extrabold">{selectedDate ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : '-'}</span>
                 </h3>
 
-                <div className="divide-y divide-gray-900">
+                <div className="divide-y divide-slate-100">
                   {selectedDateTasks.length > 0 ? (
                     selectedDateTasks.map(task => {
                       const lot = lots.find(l => l.id === task.lot_id);
@@ -352,32 +352,32 @@ export const TasksView = () => {
                             type="checkbox"
                             checked={task.is_completed}
                             onChange={() => toggleTask(task.id)}
-                            className="mt-1.5 rounded-md border-gray-700 bg-gray-800 text-emerald-500 focus:ring-emerald-500/50"
+                            className="mt-1.5 rounded border-slate-305 bg-white text-emerald-600 focus:ring-emerald-500/50 cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">
-                            <h4 className={`text-sm font-semibold ${task.is_completed ? 'line-through text-gray-500' : 'text-white'}`}>
+                            <h4 className={`text-sm font-bold ${task.is_completed ? 'line-through text-slate-405 font-medium' : 'text-slate-850'}`}>
                               {task.title}
                             </h4>
                             {task.notes && (
-                              <p className="text-xs text-gray-400 mt-1.5">{task.notes}</p>
+                              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed font-medium">{task.notes}</p>
                             )}
                             <div className="flex flex-wrap items-center gap-3 mt-2">
-                              <span className="flex items-center gap-1 text-[11px] text-gray-500">
-                                <Sprout size={12} className="text-emerald-400" />
+                              <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-bold">
+                                <Sprout size={12} className="text-emerald-600" />
                                 {lotName}
                               </span>
                               <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                                task.type === 'riego' ? 'bg-blue-500/10 text-blue-400' :
-                                task.type === 'fertilizante' ? 'bg-emerald-500/10 text-emerald-400' :
-                                task.type === 'poda' ? 'bg-yellow-500/10 text-yellow-400' :
-                                task.type === 'preventivo' ? 'bg-red-500/10 text-red-400' :
-                                'bg-gray-500/10 text-gray-400'
+                                task.type === 'riego' ? 'bg-blue-50 text-blue-600 border border-blue-105' :
+                                task.type === 'fertilizante' ? 'bg-emerald-50 text-emerald-600 border border-emerald-105' :
+                                task.type === 'poda' ? 'bg-yellow-50 text-yellow-600 border border-yellow-105' :
+                                task.type === 'preventivo' ? 'bg-red-50 text-red-650 border border-red-105' :
+                                'bg-slate-50 text-slate-650 border border-slate-105'
                               }`}>{task.type}</span>
                             </div>
                           </div>
                           <button
                             onClick={() => deleteTask(task.id)}
-                            className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded-lg border border-transparent hover:border-red-500/10 transition"
+                            className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg border border-transparent transition"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -385,7 +385,7 @@ export const TasksView = () => {
                       );
                     })
                   ) : (
-                    <div className="py-8 text-center text-gray-500 text-sm">
+                    <div className="py-8 text-center text-slate-400 text-sm font-semibold">
                       No hay tareas programadas para esta fecha.
                     </div>
                   )}
@@ -394,18 +394,18 @@ export const TasksView = () => {
             </div>
           ) : (
             /* Vista de Lista Tradicional */
-            <div className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-md">
-              <div className="p-6 border-b border-gray-900 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <CheckCircle2 size={20} className="text-emerald-400" />
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <CheckCircle2 size={20} className="text-emerald-600" />
                   Lista de Tareas
                 </h3>
                 <div className="flex items-center gap-2">
-                  <Filter size={16} className="text-gray-500" />
+                  <Filter size={16} className="text-slate-400" />
                   <select
                     value={filter}
                     onChange={(e) => setFilter(e.target.value as typeof filter)}
-                    className="px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                    className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 text-sm focus:outline-none focus:border-emerald-500 shadow-sm"
                   >
                     <option value="pending">Pendientes</option>
                     <option value="completed">Completadas</option>
@@ -414,7 +414,7 @@ export const TasksView = () => {
                 </div>
               </div>
 
-              <div className="divide-y divide-gray-900">
+              <div className="divide-y divide-slate-100">
                 {filteredTasks.length > 0 ? (
                   filteredTasks.map(task => {
                     const lot = lots.find(l => l.id === task.lot_id);
@@ -427,42 +427,42 @@ export const TasksView = () => {
                     });
 
                     return (
-                      <div key={task.id} className={`p-5 hover:bg-gray-900/30 transition ${task.is_completed ? 'opacity-60' : ''}`}>
+                      <div key={task.id} className={`p-5 hover:bg-slate-50/50 transition ${task.is_completed ? 'opacity-60' : ''}`}>
                         <div className="flex items-start gap-4">
                           <input
                             type="checkbox"
                             checked={task.is_completed}
                             onChange={() => toggleTask(task.id)}
-                            className="mt-1.5 rounded-md border-gray-700 bg-gray-800 text-emerald-500 focus:ring-emerald-500/50"
+                            className="mt-1.5 rounded border-slate-350 bg-white text-emerald-600 focus:ring-emerald-500/50 cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">
-                            <h4 className={`text-sm font-semibold ${task.is_completed ? 'line-through text-gray-500' : 'text-white'}`}>
+                            <h4 className={`text-sm font-bold ${task.is_completed ? 'line-through text-slate-405 font-medium' : 'text-slate-800'}`}>
                               {task.title}
                             </h4>
                             {task.notes && (
-                              <p className="text-xs text-gray-400 mt-1.5">{task.notes}</p>
+                              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed font-medium">{task.notes}</p>
                             )}
                             <div className="flex flex-wrap items-center gap-3 mt-2.5">
-                              <span className="flex items-center gap-1 text-[11px] text-gray-500">
-                                <Calendar size={12} />
+                              <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-bold">
+                                <Calendar size={12} className="text-slate-400" />
                                 {formattedDate}
                               </span>
-                              <span className="flex items-center gap-1 text-[11px] text-gray-500">
-                                <Sprout size={12} className="text-emerald-400" />
+                              <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-bold">
+                                <Sprout size={12} className="text-emerald-600" />
                                 {lotName}
                               </span>
                               <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                                task.type === 'riego' ? 'bg-blue-500/10 text-blue-400' :
-                                task.type === 'fertilizante' ? 'bg-emerald-500/10 text-emerald-400' :
-                                task.type === 'poda' ? 'bg-yellow-500/10 text-yellow-400' :
-                                task.type === 'preventivo' ? 'bg-red-500/10 text-red-400' :
-                                'bg-gray-500/10 text-gray-400'
+                                task.type === 'riego' ? 'bg-blue-50 text-blue-600 border border-blue-105' :
+                                task.type === 'fertilizante' ? 'bg-emerald-50 text-emerald-600 border border-emerald-105' :
+                                task.type === 'poda' ? 'bg-yellow-50 text-yellow-600 border border-yellow-105' :
+                                task.type === 'preventivo' ? 'bg-red-50 text-red-650 border border-red-105' :
+                                'bg-slate-50 text-slate-600 border border-slate-105'
                               }`}>{task.type}</span>
                             </div>
                           </div>
                           <button
                             onClick={() => deleteTask(task.id)}
-                            className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded-lg border border-transparent hover:border-red-500/10 transition"
+                            className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg border border-transparent transition"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -471,7 +471,7 @@ export const TasksView = () => {
                     );
                   })
                 ) : (
-                  <div className="p-16 text-center text-gray-500">
+                  <div className="p-16 text-center text-slate-400 font-semibold">
                     <CheckCircle2 size={36} className="mx-auto text-emerald-500/20 mb-3" />
                     <p>No tienes tareas en esta sección.</p>
                   </div>

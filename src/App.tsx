@@ -35,10 +35,10 @@ function App() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen bg-gray-950 text-gray-100 items-center justify-center font-sans select-none">
+      <div className="flex min-h-screen bg-slate-50 text-slate-800 items-center justify-center font-sans select-none">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-gray-500 text-sm animate-pulse">Verificando sesión...</p>
+          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-slate-500 text-sm font-medium animate-pulse">Verificando sesión...</p>
         </div>
       </div>
     );
@@ -51,21 +51,21 @@ function App() {
   return (
     <GrowProvider>
       <BrowserRouter>
-        <div className="flex min-h-screen bg-gray-900 text-gray-100 font-sans relative overflow-x-hidden">
+        <div className="flex min-h-screen bg-slate-50 text-slate-800 font-sans relative overflow-x-hidden">
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           
           <div className="flex-1 flex flex-col min-w-0">
             {/* Top Bar for Mobile */}
-            <header className="flex md:hidden items-center justify-between px-6 py-4 bg-gray-950 border-b border-gray-800 sticky top-0 z-40">
+            <header className="flex md:hidden items-center justify-between px-6 py-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/10 rounded-xl text-green-400 border border-green-500/20">
+                <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
                   <Sprout size={20} />
                 </div>
                 <span className="font-bold text-lg text-white">GrowManager</span>
               </div>
               <button 
                 onClick={() => setSidebarOpen(true)}
-                className="p-2 hover:bg-gray-900 rounded-xl text-gray-400 hover:text-white transition"
+                className="p-2 hover:bg-slate-800 rounded-xl text-gray-400 hover:text-white transition"
               >
                 <Menu size={24} />
               </button>

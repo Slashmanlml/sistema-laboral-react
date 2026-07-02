@@ -60,23 +60,23 @@ export const SettingsView = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto select-none">
+    <div className="space-y-8 max-w-5xl mx-auto select-none text-slate-700">
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold text-white tracking-tight">Ajustes y Parámetros</h2>
-        <p className="text-gray-400 mt-1">Configura tu catálogo de genéticas, ayudantes y copias de seguridad.</p>
+        <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Ajustes y Parámetros</h2>
+        <p className="text-slate-500 mt-1 font-medium">Configura tu catálogo de genéticas, ayudantes y copias de seguridad.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
         {/* Columna Izquierda: Genéticas y Ayudantes */}
         <div className="space-y-8">
           {/* Gestión de Genéticas */}
-          <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-2.5 mb-5">
-              <div className="p-2 bg-green-500/10 rounded-xl text-green-400 border border-green-500/20">
+              <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
                 <Dna size={22} />
               </div>
-              <h3 className="text-lg font-bold text-white">Mis Genéticas</h3>
+              <h3 className="text-lg font-bold text-slate-800">Mis Genéticas</h3>
             </div>
 
             <form onSubmit={handleAddStrain} className="flex gap-3 mb-6">
@@ -84,14 +84,14 @@ export const SettingsView = () => {
                 type="text"
                 value={strainName}
                 onChange={(e) => setStrainName(e.target.value)}
-                className="flex-1 px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                 placeholder="Ej: Gorilla Glue #4"
                 required
               />
               <select
                 value={strainType}
                 onChange={(e) => setStrainType(e.target.value as typeof strainType)}
-                className="px-3 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
               >
                 <option value="Híbrido">Híbrido</option>
                 <option value="Índica">Índica</option>
@@ -100,7 +100,7 @@ export const SettingsView = () => {
               </select>
               <button
                 type="submit"
-                className="p-2.5 bg-green-500 hover:bg-green-600 text-gray-950 rounded-xl transition duration-200"
+                className="p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition duration-150 shadow-sm"
               >
                 <Plus size={20} />
               </button>
@@ -109,32 +109,32 @@ export const SettingsView = () => {
             <ul className="space-y-2 max-h-60 overflow-y-auto pr-1">
               {strains.length > 0 ? (
                 strains.map(s => (
-                  <li key={s.id} className="flex items-center justify-between px-4 py-3 bg-gray-900/50 border border-gray-800 rounded-xl">
+                  <li key={s.id} className="flex items-center justify-between px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-semibold text-white">{s.name}</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full">{s.type}</span>
+                      <span className="text-sm font-bold text-slate-800">{s.name}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full">{s.type}</span>
                     </div>
                     <button
                       onClick={() => deleteStrain(s.id)}
-                      className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded-lg border border-transparent hover:border-red-500/10 transition"
+                      className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg border border-transparent transition"
                     >
                       <Trash2 size={14} />
                     </button>
                   </li>
                 ))
               ) : (
-                <li className="text-center text-gray-500 text-sm py-6">No hay genéticas registradas.</li>
+                <li className="text-center text-slate-400 text-sm py-6 font-medium">No hay genéticas registradas.</li>
               )}
             </ul>
           </div>
 
           {/* Gestión de Ayudantes / Cultivadores */}
-          <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-2.5 mb-5">
-              <div className="p-2 bg-green-500/10 rounded-xl text-green-400 border border-green-500/20">
+              <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
                 <Users size={22} />
               </div>
-              <h3 className="text-lg font-bold text-white">Cultivadores / Ayudantes</h3>
+              <h3 className="text-lg font-bold text-slate-800">Cultivadores / Ayudantes</h3>
             </div>
 
             <form onSubmit={handleAddHelper} className="flex gap-3 mb-6">
@@ -142,13 +142,13 @@ export const SettingsView = () => {
                 type="text"
                 value={helperName}
                 onChange={(e) => setHelperName(e.target.value)}
-                className="flex-1 px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                 placeholder="Nombre del ayudante (Ej: Juan)"
                 required
               />
               <button
                 type="submit"
-                className="p-2.5 bg-green-500 hover:bg-green-600 text-gray-950 rounded-xl transition duration-200"
+                className="p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition duration-150 shadow-sm"
               >
                 <Plus size={20} />
               </button>
@@ -157,47 +157,47 @@ export const SettingsView = () => {
             <ul className="space-y-2 max-h-60 overflow-y-auto pr-1">
               {helpers && helpers.length > 0 ? (
                 helpers.map(h => (
-                  <li key={h.id} className="flex items-center justify-between px-4 py-3 bg-gray-900/50 border border-gray-800 rounded-xl">
-                    <span className="text-sm font-semibold text-white">{h.name}</span>
+                  <li key={h.id} className="flex items-center justify-between px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <span className="text-sm font-bold text-slate-800">{h.name}</span>
                     <button
                       onClick={() => deleteHelper(h.id)}
-                      className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded-lg border border-transparent hover:border-red-500/10 transition"
+                      className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg border border-transparent transition"
                     >
                       <Trash2 size={14} />
                     </button>
                   </li>
                 ))
               ) : (
-                <li className="text-center text-gray-500 text-sm py-6">Solo estás tú registrado. Añade ayudantes para registrar quién regó.</li>
+                <li className="text-center text-slate-400 text-sm py-6 font-medium">Solo estás tú registrado. Añade ayudantes para registrar quién regó.</li>
               )}
             </ul>
           </div>
         </div>
 
         {/* Columna Derecha: Base de Datos y Copias de Seguridad */}
-        <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2.5 mb-5">
-            <div className="p-2 bg-blue-500/10 rounded-xl text-blue-400 border border-blue-500/20">
+            <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-xl text-blue-600">
               <Database size={22} />
             </div>
-            <h3 className="text-lg font-bold text-white">Base de Datos</h3>
+            <h3 className="text-lg font-bold text-slate-800">Base de Datos</h3>
           </div>
 
-          <p className="text-xs text-gray-400 mb-6 leading-relaxed">
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium">
             Tus datos se guardan de forma privada y segura en tu cuenta de Supabase. Descarga copias de seguridad periódicamente para tu tranquilidad.
           </p>
 
           <div className="space-y-4">
             <button
               onClick={handleExport}
-              className="w-full flex items-center justify-center gap-2.5 px-5 py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl border border-gray-800 transition duration-200"
+              className="w-full flex items-center justify-center gap-2.5 px-5 py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-200 transition duration-150 shadow-sm"
             >
-              <Download size={18} className="text-green-400" />
+              <Download size={18} className="text-emerald-600" />
               Exportar Copia (.json)
             </button>
 
-            <label className="w-full flex items-center justify-center gap-2.5 px-5 py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl border border-gray-800 transition duration-200 cursor-pointer">
-              <Upload size={18} className="text-blue-400" />
+            <label className="w-full flex items-center justify-center gap-2.5 px-5 py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-200 transition duration-150 cursor-pointer shadow-sm">
+              <Upload size={18} className="text-blue-600" />
               Importar Copia
               <input
                 type="file"
@@ -209,12 +209,12 @@ export const SettingsView = () => {
           </div>
 
           {/* Zona de Peligro */}
-          <div className="mt-8 p-4 bg-red-500/5 border border-red-500/20 rounded-xl">
+          <div className="mt-8 p-4 bg-red-50 border border-red-150 rounded-xl">
             <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle size={16} className="text-red-400" />
-              <h4 className="text-sm font-bold text-red-400">Zona de Peligro</h4>
+              <AlertTriangle size={16} className="text-red-600" />
+              <h4 className="text-sm font-bold text-red-600">Zona de Peligro</h4>
             </div>
-            <p className="text-xs text-gray-400 mb-4">
+            <p className="text-xs text-slate-500 mb-4 font-medium">
               Esto borrará toda la información de tu base de datos en la nube. Esta acción es irreversible.
             </p>
             <button
@@ -223,7 +223,7 @@ export const SettingsView = () => {
                   resetDatabase();
                 }
               }}
-              className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold rounded-xl border border-red-500/20 transition duration-200"
+              className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-red-50 hover:bg-red-100/70 text-red-600 font-bold rounded-xl border border-red-200 transition duration-150"
             >
               <Trash2 size={16} />
               Restaurar de Fábrica
@@ -234,4 +234,3 @@ export const SettingsView = () => {
     </div>
   );
 };
-

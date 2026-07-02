@@ -32,6 +32,7 @@ export interface Log {
   water_amount?: number;
   watered_by?: string;
   notes?: string;
+  image_url?: string;
 }
 
 

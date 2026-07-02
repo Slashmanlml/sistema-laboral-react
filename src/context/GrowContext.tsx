@@ -26,22 +26,22 @@ const getSeeds = () => {
   const initialLots: Lot[] = [
     {
       id: lot1Id,
-      name: 'Carpa Vegetativo - Domo 1',
+      name: 'Carpa Vegetativo - Cama 1',
       strain: 'Moby Dick',
       plant_count: 4,
       stage: 'Vegetativo',
       start_date: date20DaysAgo,
-      notes: 'Sustrato Light Mix, iluminación LED 240W. Entrenando en LST.',
+      notes: 'Sustrato Fibra de Coco con perlita. LED 240W.',
       is_archived: false
     },
     {
       id: lot2Id,
-      name: 'Sala Flora Principal',
-      strain: 'Gorilla Glue #4',
+      name: 'Cama 1 de Flora',
+      strain: 'Zaza, Straw, PK, Skittles, DK',
       plant_count: 8,
       stage: 'Floración',
       start_date: date45DaysAgo,
-      notes: 'Maceteros de tela de 15L con supersoil. Sistema Scrog.',
+      notes: 'Fibra de coco pura en camas elevadas. Riego mineral por goteo.',
       is_archived: false
     }
   ];
@@ -60,16 +60,16 @@ const getSeeds = () => {
       temp,
       humidity,
       vpd,
-      ph: 6.3,
+      ph: 5.8,
       ec: 1.4,
       water_amount: 5,
-      notes: 'Riego rutinario.'
+      notes: 'Riego con sales minerales.'
     });
   }
 
   const initialTasks: Task[] = [
-    { id: `task_${suffix}_1`, lot_id: lot2Id, title: 'Riego con Nutrientes Flora', date: todayStr, type: 'fertilizante', notes: 'Diluir 2ml/L FloraBloom en agua desclorada.', is_completed: false },
-    { id: `task_${suffix}_2`, lot_id: lot1Id, title: 'Aplicación Preventiva de Neem', date: yesterdayStr, type: 'preventivo', notes: 'Pulverizar foliar al apagarse las luces.', is_completed: true },
+    { id: `task_${suffix}_1`, lot_id: lot2Id, title: 'Riego con Nutrientes Flora', date: todayStr, type: 'fertilizante', notes: 'Dosis: A: 3.8 ml/L, B: 3.8 ml/L, C: 2.6 ml/L. pH 5.8, EC 1.44.', is_completed: false },
+    { id: `task_${suffix}_2`, lot_id: lot1Id, title: 'Aplicación Preventiva foliar', date: yesterdayStr, type: 'preventivo', notes: 'Pulverizar al apagarse las luces.', is_completed: true },
     { id: `task_${suffix}_3`, lot_id: lot1Id, title: 'Defoliación de bajos y poda', date: tomorrowStr, type: 'poda', notes: 'Quitar brotes débiles de la zona baja.', is_completed: false }
   ];
 
@@ -95,6 +95,7 @@ interface GrowContextType {
   deleteStrain: (id: string) => Promise<void>;
   addHelper: (name: string) => Promise<void>;
   deleteHelper: (id: string) => Promise<void>;
+  uploadPhoto: (file: File) => Promise<string | null>;
   resetDatabase: () => Promise<void>;
 }
 
@@ -164,7 +165,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchData();
   }, []);
 
-  // Generador de tareas automático en base al cronograma
+  // Generador de tareas automático en base al cronograma de Ryanodine
   const generateScheduleTasks = async (lotId: string, stage: string, startDateStr: string) => {
     try {
       // 1. Eliminar tareas previas autogeneradas para este lote
@@ -191,10 +192,10 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return {
           id: `task_sched_${lotId}_${stage === 'Vegetativo' ? 'veg' : 'flo'}_${s.week}`,
           lot_id: lotId,
-          title: s.title,
+          title: `${s.title}`,
           date: taskDate.toISOString().split('T')[0],
           type: 'fertilizante',
-          notes: `pH objetivo: ${s.ph} | EC objetivo: ${s.ec} mS/cm. ${s.notes}`,
+          notes: `pH: ${s.ph} | EC: ${s.ec} mS/cm. Dosis: A: ${s.makroA} ml/L, B: ${s.mikroB} ml/L, C: ${s.calcisC} ml/L. ${s.notes}`,
           is_completed: false
         };
       });
@@ -230,21 +231,14 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const editLot = async (updatedLot: Lot) => {
+  const editLot = async (lot: Lot) => {
     try {
-      const { error } = await supabase.from('lots').update({
-        name: updatedLot.name,
-        strain: updatedLot.strain,
-        plant_count: updatedLot.plant_count,
-        stage: updatedLot.stage,
-        start_date: updatedLot.start_date,
-        notes: updatedLot.notes
-      }).eq('id', updatedLot.id);
+      const { error } = await supabase.from('lots').update(lot).eq('id', lot.id);
       if (error) throw error;
-      setLots(prev => prev.map(l => l.id === updatedLot.id ? updatedLot : l));
+      setLots(prev => prev.map(l => l.id === lot.id ? lot : l));
 
-      // Regenerar cronograma por si cambió la fecha o la fase
-      await generateScheduleTasks(updatedLot.id, updatedLot.stage, updatedLot.start_date);
+      // Regenerar tareas si cambian fecha o fase
+      await generateScheduleTasks(lot.id, lot.stage, lot.start_date);
     } catch (err) {
       console.error("Error al editar lote:", err);
     }
@@ -266,72 +260,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setLots(prev => prev.map(l => l.id === id ? { ...l, is_archived: false } : l));
     } catch (err) {
-      console.error("Error al desarchivar lote:", err);
-    }
-  };
-
-  const addLog = async (log: Omit<Log, 'id' | 'date' | 'vpd'>) => {
-    const vpd = calculateVPD(log.temp, log.humidity);
-    const newLog: Log = {
-      ...log,
-      id: 'log_' + Date.now(),
-      date: new Date().toISOString(),
-      vpd
-    };
-    try {
-      const { error } = await supabase.from('logs').insert(newLog);
-      if (error) throw error;
-      setLogs(prev => [newLog, ...prev]);
-    } catch (err) {
-      console.error("Error al registrar log:", err);
-    }
-  };
-
-  const deleteLog = async (id: string) => {
-    try {
-      const { error } = await supabase.from('logs').delete().eq('id', id);
-      if (error) throw error;
-      setLogs(prev => prev.filter(l => l.id !== id));
-    } catch (err) {
-      console.error("Error al borrar log:", err);
-    }
-  };
-
-  const addTask = async (task: Omit<Task, 'id' | 'is_completed'>) => {
-    const newTask: Task = {
-      ...task,
-      id: 'task_' + Date.now(),
-      is_completed: false
-    };
-    try {
-      const { error } = await supabase.from('tasks').insert(newTask);
-      if (error) throw error;
-      setTasks(prev => [...prev, newTask]);
-    } catch (err) {
-      console.error("Error al agregar tarea:", err);
-    }
-  };
-
-  const toggleTask = async (id: string) => {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    const nextVal = !task.is_completed;
-    try {
-      const { error } = await supabase.from('tasks').update({ is_completed: nextVal }).eq('id', id);
-      if (error) throw error;
-      setTasks(prev => prev.map(t => t.id === id ? { ...t, is_completed: nextVal } : t));
-    } catch (err) {
-      console.error("Error al cambiar estado de la tarea:", err);
-    }
-  };
-
-  const deleteTask = async (id: string) => {
-    try {
-      const { error } = await supabase.from('tasks').delete().eq('id', id);
-      if (error) throw error;
-      setTasks(prev => prev.filter(t => t.id !== id));
-    } catch (err) {
-      console.error("Error al borrar tarea:", err);
+      console.error("Error al reactivar lote:", err);
     }
   };
 
@@ -359,6 +288,71 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const addLog = async (log: Omit<Log, 'id' | 'date' | 'vpd'>) => {
+    const vpd = calculateVPD(log.temp, log.humidity);
+    const newLog: Log = {
+      ...log,
+      id: 'log_' + Date.now(),
+      date: new Date().toISOString(),
+      vpd
+    };
+    try {
+      const { error } = await supabase.from('logs').insert(newLog);
+      if (error) throw error;
+      setLogs(prev => [newLog, ...prev]);
+    } catch (err) {
+      console.error("Error al agregar registro:", err);
+    }
+  };
+
+  const deleteLog = async (id: string) => {
+    try {
+      const { error } = await supabase.from('logs').delete().eq('id', id);
+      if (error) throw error;
+      setLogs(prev => prev.filter(l => l.id !== id));
+    } catch (err) {
+      console.error("Error al borrar registro:", err);
+    }
+  };
+
+  const addTask = async (task: Omit<Task, 'id' | 'is_completed'>) => {
+    const newTask: Task = {
+      ...task,
+      id: 'task_' + Date.now(),
+      is_completed: false
+    };
+    try {
+      const { error } = await supabase.from('tasks').insert(newTask);
+      if (error) throw error;
+      setTasks(prev => [...prev, newTask]);
+    } catch (err) {
+      console.error("Error al agregar tarea:", err);
+    }
+  };
+
+  const toggleTask = async (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const updatedTask = { ...task, is_completed: !task.is_completed };
+    try {
+      const { error } = await supabase.from('tasks').update({ is_completed: updatedTask.is_completed }).eq('id', id);
+      if (error) throw error;
+      setTasks(prev => prev.map(t => t.id === id ? updatedTask : t));
+    } catch (err) {
+      console.error("Error al actualizar tarea:", err);
+    }
+  };
+
+  const deleteTask = async (id: string) => {
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      if (error) throw error;
+      setTasks(prev => prev.filter(t => t.id !== id));
+    } catch (err) {
+      console.error("Error al borrar tarea:", err);
+    }
+  };
+
   const addHelper = async (name: string) => {
     const newHelper: Helper = {
       id: 'helper_' + Date.now(),
@@ -383,6 +377,32 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const uploadPhoto = async (file: File): Promise<string | null> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const filePath = fileName;
+
+      const { error: uploadError } = await supabase.storage
+        .from('grow-photos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('grow-photos')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (err) {
+      console.error("Error al subir foto a Supabase Storage:", err);
+      return null;
+    }
+  };
+
   const resetDatabase = async () => {
     try {
       await Promise.all([
@@ -404,13 +424,13 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       strains, lots, logs, tasks, helpers,
       addLot, editLot, archiveLot, unarchiveLot,
       addLog, deleteLog, addTask, toggleTask, deleteTask,
-      addStrain, deleteStrain, addHelper, deleteHelper, resetDatabase
+      addStrain, deleteStrain, addHelper, deleteHelper, uploadPhoto, resetDatabase
     }}>
       {loading ? (
-        <div className="flex min-h-screen bg-gray-900 text-gray-100 items-center justify-center font-sans">
+        <div className="flex min-h-screen bg-slate-50 text-slate-800 items-center justify-center font-sans">
           <div className="text-center space-y-4">
-            <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-gray-400 text-sm animate-pulse">Conectando con Supabase...</p>
+            <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-slate-500 text-sm animate-pulse font-medium">Conectando con Supabase...</p>
           </div>
         </div>
       ) : children}
@@ -423,4 +443,3 @@ export const useGrow = () => {
   if (!context) throw new Error('useGrow debe ser usado dentro de un GrowProvider');
   return context;
 };
-

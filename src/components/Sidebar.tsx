@@ -27,23 +27,23 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         />
       )}
 
-      <aside className={`fixed md:static inset-y-0 left-0 w-64 bg-gray-950 border-r border-gray-800 text-gray-200 p-6 flex flex-col h-screen select-none z-50 transition-transform duration-300 ease-in-out md:translate-x-0 ${
+      <aside className={`fixed md:static inset-y-0 left-0 w-64 bg-slate-950 border-r border-slate-900 text-slate-200 p-6 flex flex-col h-screen select-none z-50 transition-transform duration-300 ease-in-out md:translate-x-0 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         {/* Header / Logo */}
         <div className="flex items-center justify-between gap-3 mb-8">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-green-500/10 rounded-xl text-green-400 border border-green-500/20">
+            <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
               <Sprout size={24} />
             </div>
             <div>
               <h1 className="text-xl font-bold font-sans tracking-tight text-white leading-none">GrowManager</h1>
-              <span className="text-xs text-gray-500">Cultivo Controlado</span>
+              <span className="text-xs text-slate-500 font-medium">Cultivo Controlado</span>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="p-1.5 hover:bg-gray-900 rounded-lg text-gray-400 hover:text-white md:hidden transition"
+            className="p-1.5 hover:bg-slate-900 rounded-lg text-slate-400 hover:text-white md:hidden transition"
           >
             <X size={18} />
           </button>
@@ -61,25 +61,25 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         {/* Bottom Section */}
         <div className="mt-auto space-y-4">
           {latestLot && (
-            <div className="p-4 bg-gray-900/50 border border-gray-800/80 rounded-2xl">
-              <div className="flex items-center gap-2 mb-2 text-xs text-green-400 font-medium">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <div className="p-4 bg-slate-900/50 border border-slate-800/80 rounded-2xl">
+              <div className="flex items-center gap-2 mb-2 text-xs text-emerald-400 font-bold uppercase tracking-wider">
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                 Lote Activo
               </div>
               <h4 className="text-sm font-semibold text-white truncate">{latestLot.name}</h4>
-              <p className="text-xs text-gray-400 mt-1 truncate">
+              <p className="text-xs text-slate-400 mt-1 truncate">
                 {latestLot.strain} • {latestLot.stage} (Día {calculateDaysElapsed(latestLot.start_date)})
               </p>
             </div>
           )}
 
-          <div className="border-t border-gray-900/60 pt-4">
+          <div className="border-t border-slate-900/60 pt-4">
             <button 
               onClick={async () => {
                 onClose();
                 await supabase.auth.signOut();
               }}
-              className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/5 border border-transparent hover:border-red-500/10 transition duration-200"
+              className="w-full flex items-center gap-3.5 px-4 py-3 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/5 border border-transparent hover:border-red-500/10 transition duration-200"
             >
               <LogOut size={20} />
               <span>Cerrar Sesión</span>
@@ -105,8 +105,8 @@ const NavItem = ({ to, active, icon, label, onClick }: NavItemProps) => (
     onClick={onClick}
     className={`flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-200 ${
       active
-        ? 'bg-green-500/10 text-green-400 border border-green-500/20 font-medium shadow-sm shadow-green-950/20'
-        : 'text-gray-400 hover:text-white hover:bg-gray-900/80 border border-transparent'
+        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-semibold shadow-sm'
+        : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent'
     }`}
   >
     {icon}
