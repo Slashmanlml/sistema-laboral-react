@@ -18,7 +18,7 @@ create table lots (
   name text not null,
   strain text not null,
   plant_count integer not null,
-  stage text not null check (stage in ('Germinación', 'Vegetativo', 'Floración', 'Secado', 'Curado')),
+  stage text not null check (stage in ('Cama 1 y 2 (Propagación)', 'Cama 3 (Preflora Temprana)', 'Cama 4 (Preflora Avanzada)', 'Cama 5 (Madres)', 'Cama 6 (Pre-flora)', 'Floración', 'Secado', 'Curado')),
   start_date date not null,
   notes text,
   is_archived boolean not null default false
