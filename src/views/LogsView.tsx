@@ -68,10 +68,7 @@ export const LogsView = () => {
   // Guía de Riego en Vivo
   const selectedLotObj = lots.find(l => l.id === lotId);
   let wateringGuide = null;
-  if (selectedLotObj && 
-      selectedLotObj.stage !== 'Cama 5 (Madres)' && 
-      selectedLotObj.stage !== 'Secado' && 
-      selectedLotObj.stage !== 'Curado') {
+  if (selectedLotObj && (selectedLotObj.stage === 'Vegetativo' || selectedLotObj.stage === 'Floración')) {
     const days = calculateDaysElapsed(selectedLotObj.start_date);
     const week = Math.floor(days / 7);
     const isFlower = selectedLotObj.stage === 'Floración';

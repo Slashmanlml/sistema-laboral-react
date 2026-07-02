@@ -29,7 +29,7 @@ const getSeeds = () => {
       name: 'Carpa Vegetativo - Cama 1',
       strain: 'Moby Dick',
       plant_count: 4,
-      stage: 'Cama 1 y 2 (Propagación)',
+      stage: 'Vegetativo',
       start_date: date20DaysAgo,
       notes: 'Sustrato Fibra de Coco con perlita. LED 240W.',
       is_archived: false
@@ -188,26 +188,17 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (deleteError) throw deleteError;
 
-      // 3. Elegir el conjunto de semanas del cronograma según la cama
+      // 3. Elegir el conjunto de semanas del cronograma según la etapa
       let scheduleWeeks = [];
       let label = '';
-      if (stage === 'Cama 1 y 2 (Propagación)') {
-        scheduleWeeks = VEG_SCHEDULE.filter(w => w.week === 0 || w.week === 1);
-        label = 'veg';
-      } else if (stage === 'Cama 3 (Preflora Temprana)') {
-        scheduleWeeks = VEG_SCHEDULE.filter(w => w.week === 2 || w.week === 3);
-        label = 'veg';
-      } else if (stage === 'Cama 4 (Preflora Avanzada)') {
-        scheduleWeeks = VEG_SCHEDULE.filter(w => w.week === 4);
-        label = 'veg';
-      } else if (stage === 'Cama 6 (Pre-flora)') {
-        scheduleWeeks = VEG_SCHEDULE.filter(w => w.week === 5);
+      if (stage === 'Vegetativo') {
+        scheduleWeeks = VEG_SCHEDULE;
         label = 'veg';
       } else if (stage === 'Floración') {
         scheduleWeeks = FLOWER_SCHEDULE;
         label = 'flo';
       } else {
-        // Para Madres, Secado, Curado, etc. no autogeneramos cronograma
+        // Para Germinación, Secado, Curado, etc. no autogeneramos cronograma de fertilizantes
         setTasks(prev => prev.filter(t => !t.id.startsWith(`task_sched_${lotId}_`)));
         return;
       }

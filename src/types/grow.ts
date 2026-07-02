@@ -11,7 +11,7 @@ export interface Lot {
   name: string;
   strain: string;
   plant_count: number;
-  stage: 'Cama 1 y 2 (Propagación)' | 'Cama 3 (Preflora Temprana)' | 'Cama 4 (Preflora Avanzada)' | 'Cama 5 (Madres)' | 'Cama 6 (Pre-flora)' | 'Floración' | 'Secado' | 'Curado';
+  stage: 'Germinación' | 'Vegetativo' | 'Floración' | 'Secado' | 'Curado';
   start_date: string;
   notes?: string;
   is_archived: boolean;
