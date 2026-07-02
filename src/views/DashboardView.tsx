@@ -92,6 +92,12 @@ export const DashboardView = () => {
     }
   };
 
+  const formatEC = (val: string): number | undefined => {
+    const num = parseFloat(val);
+    if (!val || isNaN(num)) return undefined;
+    return num >= 10 ? num / 1000 : num;
+  };
+
   const handleQuickLogSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLot || !temp || !humidity) return;
@@ -101,12 +107,11 @@ export const DashboardView = () => {
       temp: parseFloat(temp),
       humidity: parseFloat(humidity),
       ph: ph ? parseFloat(ph) : undefined,
-      ec: ec ? parseFloat(ec) : undefined,
+      ec: formatEC(ec),
       water_amount: water ? parseFloat(water) : undefined,
       notes: notes || undefined
     });
 
-    // Resetear formulario
     setSelectedLot('');
     setTemp('');
     setHumidity('');
@@ -428,14 +433,15 @@ export const DashboardView = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-1">EC Riego</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">EC Riego <span className="text-slate-400 font-normal">(mS/cm o μS)</span></label>
                   <input
                     type="number"
                     step="0.01"
                     value={ec}
                     onChange={(e) => setEc(e.target.value)}
+                    onBlur={() => { const n = parseFloat(ec); if (!isNaN(n) && n >= 10) setEc((n/1000).toFixed(2)); }}
                     className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
-                    placeholder="Ej: 1.2"
+                    placeholder="Ej: 1.2 o 1200"
                   />
                 </div>
                 <div>

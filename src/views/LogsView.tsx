@@ -32,6 +32,13 @@ export const LogsView = () => {
   // Filtros
   const [onlyWaterings, setOnlyWaterings] = useState(false);
 
+  const handleECBlur = (val: string, setter: (v: string) => void) => {
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 10) {
+      setter((num / 1000).toFixed(2));
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user?.email) {
@@ -122,14 +129,22 @@ export const LogsView = () => {
         }
       }
 
+      const formatEC = (val: string): number | undefined => {
+        if (!val) return undefined;
+        const num = parseFloat(val);
+        if (isNaN(num)) return undefined;
+        if (num >= 10) return num / 1000;
+        return num;
+      };
+
       await addLog({
         lot_id: lotId,
         temp: parseFloat(temp),
         humidity: parseFloat(humidity),
         ph: ph ? parseFloat(ph) : undefined,
-        ec: ec ? parseFloat(ec) : undefined,
+        ec: formatEC(ec),
         ph_runoff: phRunoff ? parseFloat(phRunoff) : undefined,
-        ec_runoff: ecRunoff ? parseFloat(ecRunoff) : undefined,
+        ec_runoff: formatEC(ecRunoff),
         water_amount: water ? parseFloat(water) : undefined,
         watered_by: wateredBy || undefined,
         notes: notes || undefined,
@@ -326,8 +341,8 @@ export const LogsView = () => {
                     <input
                       type="number"
                       step="0.01"
-                      value={ec}
                       onChange={(e) => setEc(e.target.value)}
+                      onBlur={() => handleECBlur(ec, setEc)}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                       placeholder="Ej: 1.4"
                     />
@@ -357,8 +372,8 @@ export const LogsView = () => {
                     <input
                       type="number"
                       step="0.01"
-                      value={ecRunoff}
                       onChange={(e) => setEcRunoff(e.target.value)}
+                      onBlur={() => handleECBlur(ecRunoff, setEcRunoff)}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                       placeholder="Ej: 1.8"
                     />
