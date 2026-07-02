@@ -3,7 +3,7 @@ import { useGrow } from '../context/GrowContext';
 import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database, Users } from 'lucide-react';
 
 export const SettingsView = () => {
-  const { strains, lots, logs, tasks, helpers, addStrain, deleteStrain, addHelper, deleteHelper, resetDatabase } = useGrow();
+  const { strains, lots, logs, tasks, helpers, addStrain, deleteStrain, addHelper, deleteHelper, clearDatabase, loadDemoData } = useGrow();
 
   // Formulario de genética
   const [strainName, setStrainName] = useState('');
@@ -209,25 +209,41 @@ export const SettingsView = () => {
           </div>
 
           {/* Zona de Peligro */}
-          <div className="mt-8 p-4 bg-red-50 border border-red-150 rounded-xl">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle size={16} className="text-red-600" />
-              <h4 className="text-sm font-bold text-red-600">Zona de Peligro</h4>
+          <div className="mt-8 p-4 bg-red-50 border border-red-150 rounded-xl space-y-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle size={16} className="text-red-600" />
+                <h4 className="text-sm font-bold text-red-600">Zona de Peligro</h4>
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
+                Estas acciones alteran los datos en la nube de Supabase para tu cuenta.
+              </p>
             </div>
-            <p className="text-xs text-slate-500 mb-4 font-medium">
-              Esto borrará toda la información de tu base de datos en la nube. Esta acción es irreversible.
-            </p>
-            <button
-              onClick={() => {
-                if (window.confirm('¿Estás seguro de querer restablecer el sistema? Se borrarán todos los datos.')) {
-                  resetDatabase();
-                }
-              }}
-              className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-red-50 hover:bg-red-100/70 text-red-600 font-bold rounded-xl border border-red-200 transition duration-150"
-            >
-              <Trash2 size={16} />
-              Restaurar de Fábrica
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  if (window.confirm('¿Estás seguro de querer vaciar el sistema? Se eliminarán todas las camas, registros diarios y tareas para que puedas cargar tus datos reales.')) {
+                    clearDatabase();
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-red-55 hover:bg-red-100/70 text-red-600 font-bold rounded-xl border border-red-200 transition duration-150"
+              >
+                <Trash2 size={16} />
+                Vaciar Base de Datos (Comenzar Limpio)
+              </button>
+
+              <button
+                onClick={() => {
+                  if (window.confirm('¿Deseas cargar los lotes, registros y tareas de demostración simulados?')) {
+                    loadDemoData();
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-200 transition duration-150"
+              >
+                <Plus size={16} className="text-slate-500" />
+                Cargar Datos de Demostración (Simulación)
+              </button>
+            </div>
           </div>
         </div>
       </div>

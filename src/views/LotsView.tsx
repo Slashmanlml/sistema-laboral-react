@@ -2,19 +2,28 @@ import React, { useState } from 'react';
 import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed } from '../utils/calculations';
 import type { Lot } from '../types/grow';
-import { Search, Plus, Archive, ArchiveRestore, Edit3, Sprout, Hash, Calendar, Layers, FileText, Calculator, Beaker, TrendingUp } from 'lucide-react';
+import { Search, Plus, Archive, ArchiveRestore, Edit3, Sprout, Hash, Calendar, Layers, FileText, Calculator, Beaker, TrendingUp, LayoutGrid, Kanban, ArrowRight } from 'lucide-react';
 import { VEG_SCHEDULE, FLOWER_SCHEDULE } from '../utils/schedules';
 
 export const LotsView = () => {
-  const { lots, strains, addLot, editLot, archiveLot, unarchiveLot } = useGrow();
+  const { lots, strains, addLot, editLot, archiveLot, unarchiveLot, addLog } = useGrow();
 
-  // Filtros
+  // Filtros y Vistas
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'archived'>('active');
+  const [viewType, setViewType] = useState<'grid' | 'pipeline'>('pipeline');
 
-  // Modal de Edición
+  // Modal de Creación / Edición estándar
   const [showModal, setShowModal] = useState(false);
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
+
+  // Modal de Trasplante / Rotación
+  const [showTransplantModal, setShowTransplantModal] = useState(false);
+  const [transplantLot, setTransplantLot] = useState<Lot | null>(null);
+  const [targetStage, setTargetStage] = useState<Lot['stage']>('Cama 3 (Preflora Temprana)');
+  const [newPotSize, setNewPotSize] = useState('3 Litros');
+  const [plantHeight, setPlantHeight] = useState('');
+  const [transplantNotes, setTransplantNotes] = useState('');
 
   // Modal de Cronograma
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -26,13 +35,23 @@ export const LotsView = () => {
   // Litros para la calculadora de dosis
   const [tankLiters, setTankLiters] = useState<number>(20);
 
-  // Formulario
+  // Formulario estándar
   const [name, setName] = useState('');
   const [strain, setStrain] = useState('');
   const [plantCount, setPlantCount] = useState('');
-  const [stage, setStage] = useState<'Germinación' | 'Vegetativo' | 'Floración' | 'Secado' | 'Curado'>('Vegetativo');
+  const [stage, setStage] = useState<Lot['stage']>('Cama 1 y 2 (Propagación)');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
+
+  // Columnas para el Kanban Pipeline de Rotación Perpetua
+  const PIPELINE_COLUMNS: { stage: Lot['stage']; label: string; pot: string; height: string }[] = [
+    { stage: 'Cama 1 y 2 (Propagación)', label: 'Cama 1/2: Propagación', pot: 'Vasos 0.5L - 1L', height: 'Hasta 25 cm' },
+    { stage: 'Cama 3 (Preflora Temprana)', label: 'Cama 3: Preflora Temprana', pot: 'Macetas 1L - 3L', height: 'Hasta 60 cm' },
+    { stage: 'Cama 4 (Preflora Avanzada)', label: 'Cama 4: Preflora Avanzada', pot: 'Macetas 3L', height: 'Estructura fuerte' },
+    { stage: 'Cama 5 (Madres)', label: 'Cama 5: Madres', pot: 'Macetas 5L', height: 'Planta Madre' },
+    { stage: 'Cama 6 (Pre-flora)', label: 'Cama 6: Pre-flora Final', pot: 'Macetas 10L', height: 'Entra 70cm, Sale 90cm' },
+    { stage: 'Floración', label: 'Sala de Flora', pot: 'Camas / Macetas 15L', height: 'Floración 10 semanas' }
+  ];
 
   // Filtrado de Lotes
   const filteredLots = lots.filter(lot => {
@@ -51,7 +70,7 @@ export const LotsView = () => {
     setName('');
     setStrain(strains.length > 0 ? strains[0].name : '');
     setPlantCount('');
-    setStage('Vegetativo');
+    setStage('Cama 1 y 2 (Propagación)');
     setStartDate(new Date().toISOString().split('T')[0]);
     setNotes('');
     setShowModal(true);
@@ -68,13 +87,43 @@ export const LotsView = () => {
     setShowModal(true);
   };
 
+  const handleOpenTransplantModal = (lot: Lot) => {
+    setTransplantLot(lot);
+    
+    // Auto-sugerir la siguiente cama en la cadena
+    let nextStage: Lot['stage'] = 'Cama 3 (Preflora Temprana)';
+    let pot = '3 Litros';
+    if (lot.stage === 'Cama 1 y 2 (Propagación)') {
+      nextStage = 'Cama 3 (Preflora Temprana)';
+      pot = '1 Litro o 3 Litros';
+    } else if (lot.stage === 'Cama 3 (Preflora Temprana)') {
+      nextStage = 'Cama 4 (Preflora Avanzada)';
+      pot = '3 Litros';
+    } else if (lot.stage === 'Cama 4 (Preflora Avanzada)') {
+      nextStage = 'Cama 6 (Pre-flora)';
+      pot = '10 Litros';
+    } else if (lot.stage === 'Cama 6 (Pre-flora)') {
+      nextStage = 'Floración';
+      pot = 'Cama de Flora';
+    } else if (lot.stage === 'Floración') {
+      nextStage = 'Secado';
+      pot = 'Colgado';
+    }
+    
+    setTargetStage(nextStage);
+    setNewPotSize(pot);
+    setPlantHeight('');
+    setTransplantNotes('');
+    setShowTransplantModal(true);
+  };
+
   const handleOpenScheduleModal = (lot: Lot) => {
     setSelectedScheduleLot(lot);
     
     // Auto-detectar la semana actual del cultivo
     const days = calculateDaysElapsed(lot.start_date);
     const currentWeek = Math.floor(days / 7);
-    const schedule = lot.stage === 'Vegetativo' ? VEG_SCHEDULE : FLOWER_SCHEDULE;
+    const schedule = lot.stage === 'Floración' ? FLOWER_SCHEDULE : VEG_SCHEDULE;
     
     // Validar límites y setear semana activa inicial
     const initialWeek = Math.max(
@@ -111,6 +160,33 @@ export const LotsView = () => {
     setShowModal(false);
   };
 
+  const handleConfirmTransplant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!transplantLot) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 1. Modificar Lote
+    const updatedLot: Lot = {
+      ...transplantLot,
+      stage: targetStage,
+      start_date: todayStr, // La fecha de inicio del lote se resetea al día del trasplante
+      notes: `Trasplantado a: ${newPotSize}. ${transplantNotes ? `Notas: ${transplantNotes}` : ''}`
+    };
+
+    await editLot(updatedLot);
+
+    // 2. Crear Log diario automático
+    await addLog({
+      lot_id: transplantLot.id,
+      temp: 24.5,
+      humidity: 55,
+      notes: `ROTACIÓN PERPETUA: Trasplantado a ${targetStage}. Maceta: ${newPotSize}.${plantHeight ? ` Altura registrada: ${plantHeight} cm.` : ''} ${transplantNotes ? ` Detalle: ${transplantNotes}` : ''}`
+    });
+
+    setShowTransplantModal(false);
+  };
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto select-none text-slate-700">
       {/* Header */}
@@ -119,13 +195,40 @@ export const LotsView = () => {
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Lotes de Cultivo</h2>
           <p className="text-slate-500 mt-1 font-medium">Monitorea tus diferentes salas, plantas y fases del ciclo.</p>
         </div>
-        <button
-          onClick={handleOpenCreateModal}
-          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150 shadow-sm text-sm"
-        >
-          <Plus size={18} />
-          Nuevo Lote
-        </button>
+        
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Toggle Vista de Tarjetas vs Pipeline Kanban */}
+          <div className="flex bg-slate-100 border border-slate-200 rounded-xl p-1 shadow-sm">
+            <button
+              onClick={() => setViewType('pipeline')}
+              className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                viewType === 'pipeline' ? 'bg-white text-emerald-605 shadow-sm border border-slate-200/50' : 'text-slate-555 hover:text-slate-800'
+              }`}
+              title="Vista de Rotación Perpetua"
+            >
+              <Kanban size={14} />
+              Rotación Perpetua
+            </button>
+            <button
+              onClick={() => setViewType('grid')}
+              className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                viewType === 'grid' ? 'bg-white text-emerald-655 shadow-sm border border-slate-200/50' : 'text-slate-555 hover:text-slate-800'
+              }`}
+              title="Vista de Lotes"
+            >
+              <LayoutGrid size={14} />
+              Lista Simple
+            </button>
+          </div>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150 shadow-sm text-sm"
+          >
+            <Plus size={18} />
+            Nuevo Lote
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -146,123 +249,208 @@ export const LotsView = () => {
           className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
         >
           <option value="active">Mostrar Activos</option>
-          <option value="archived">Mostrar Archivados / Cosechados</option>
+          <option value="archived">Mostrar Archivados</option>
           <option value="all">Mostrar Todos</option>
         </select>
       </div>
 
-      {/* Grid de Lotes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredLots.length > 0 ? (
-          filteredLots.map(lot => {
-            const days = calculateDaysElapsed(lot.start_date);
-            const progress = Math.min(Math.round((days / 90) * 100), 100);
+      {/* RENDERIZADO DE VISTAS */}
+      {viewType === 'pipeline' ? (
+        /* VISTA DE KANBAN PIPELINE DE ROTACIÓN PERPETUA */
+        <div className="overflow-x-auto pb-4 scrollbar-thin">
+          <div className="flex gap-4 min-w-[1200px] h-[75vh]">
+            {PIPELINE_COLUMNS.map(col => {
+              const colLots = filteredLots.filter(l => l.stage === col.stage);
 
-            return (
-              <div key={lot.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-slate-300 transition duration-150 flex flex-col justify-between shadow-sm">
-                <div className="p-6 space-y-5">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900 tracking-tight">{lot.name}</h3>
-                      <span className="text-xs text-emerald-600 font-bold flex items-center gap-1.5 mt-1.5">
-                        <Sprout size={14} />
-                        {lot.strain}
-                      </span>
+              return (
+                <div key={col.stage} className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col min-w-[240px]">
+                  {/* Cabecera de Columna */}
+                  <div className="mb-3">
+                    <h4 className="font-extrabold text-slate-900 text-sm truncate">{col.label}</h4>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1 font-semibold">
+                      <span>{col.pot}</span>
+                      <span>{col.height}</span>
                     </div>
-                    <span className="text-xs font-bold px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full">
-                      {lot.stage}
-                    </span>
+                    <div className="w-full bg-slate-250/50 h-0.5 mt-2 rounded" />
                   </div>
 
-                  <div className="space-y-3 pt-3 border-t border-slate-100">
-                    <div className="flex items-center gap-2.5 text-sm text-slate-500 font-medium">
-                      <Hash size={16} className="text-slate-400" />
-                      <span>Macetas / Unidades:</span>
-                      <span className="ml-auto text-slate-800 font-bold">{lot.plant_count}</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 text-sm text-slate-500 font-medium">
-                      <Calendar size={16} className="text-slate-400" />
-                      <span>Inicio de ciclo:</span>
-                      <span className="ml-auto text-slate-800 font-bold">{lot.start_date}</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 text-sm text-slate-500 font-medium">
-                      <Layers size={16} className="text-slate-400" />
-                      <span>Tiempo de cultivo:</span>
-                      <span className="ml-auto text-slate-800 font-bold">{days} días</span>
-                    </div>
+                  {/* Lista de Tarjetas en la cama */}
+                  <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                    {colLots.length > 0 ? (
+                      colLots.map(lot => {
+                        const days = calculateDaysElapsed(lot.start_date);
+                        return (
+                          <div key={lot.id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm hover:border-slate-350 transition duration-150 space-y-3">
+                            <div>
+                              <div className="flex justify-between items-start">
+                                <h5 className="font-extrabold text-slate-900 text-sm truncate">{lot.name}</h5>
+                                <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {lot.plant_count}p
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-emerald-650 font-bold block truncate mt-1">
+                                {lot.strain}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs font-semibold text-slate-500 pt-2 border-t border-slate-100">
+                              <span>En esta cama:</span>
+                              <span className="text-slate-800">{days} días</span>
+                            </div>
+
+                            {/* Botonera de Acción rápida */}
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                              <button
+                                onClick={() => handleOpenScheduleModal(lot)}
+                                className="py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1"
+                              >
+                                <Calculator size={10} />
+                                Sales
+                              </button>
+                              <button
+                                onClick={() => handleOpenTransplantModal(lot)}
+                                className="py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1"
+                                title="Rotar de Cama / Trasplantar"
+                              >
+                                <span>Trasplante</span>
+                                <ArrowRight size={10} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="h-32 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 p-4 text-center">
+                        <span className="text-xs font-semibold">Vacía</span>
+                      </div>
+                    )}
                   </div>
-
-                  {lot.notes && (
-                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1 flex items-center gap-1">
-                        <FileText size={10} /> Notas de medio
-                      </span>
-                      <p className="text-xs text-slate-650 leading-relaxed font-medium truncate">{lot.notes}</p>
-                    </div>
-                  )}
-
-                  {/* Progreso del ciclo */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-slate-400 font-bold">
-                      <span>Progreso estimado (Día {days} / 90)</span>
-                      <span>{progress}%</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
-                    </div>
-                  </div>
-
-                  {/* Botón de Cronograma de Riego */}
-                  {(lot.stage === 'Vegetativo' || lot.stage === 'Floración') && (
-                    <button
-                      onClick={() => handleOpenScheduleModal(lot)}
-                      className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100/70 text-emerald-600 font-bold text-xs rounded-xl border border-emerald-100 flex items-center justify-center gap-2 transition duration-150 shadow-sm"
-                    >
-                      <Calendar size={14} />
-                      Ver Cronograma de Riego
-                    </button>
-                  )}
                 </div>
-
-                {/* Footer del card */}
-                <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-between gap-3">
-                  <button
-                    onClick={() => handleOpenEditModal(lot)}
-                    className="flex-1 py-2 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-800 font-bold text-xs rounded-lg border border-slate-200 flex items-center justify-center gap-1.5 transition duration-150 shadow-sm"
-                  >
-                    <Edit3 size={14} />
-                    Editar
-                  </button>
-                  {lot.is_archived ? (
-                    <button
-                      onClick={() => unarchiveLot(lot.id)}
-                      className="flex-1 py-2 bg-white hover:bg-emerald-50 text-emerald-600 font-bold text-xs rounded-lg border border-slate-200 flex items-center justify-center gap-1.5 transition duration-150 shadow-sm"
-                    >
-                      <ArchiveRestore size={14} />
-                      Reactivar
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => archiveLot(lot.id)}
-                      className="flex-1 py-2 bg-white hover:bg-red-50 text-red-600 font-bold text-xs rounded-lg border border-slate-200 flex items-center justify-center gap-1.5 transition duration-150 shadow-sm"
-                    >
-                      <Archive size={14} />
-                      Archivar
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="col-span-full bg-white border border-slate-200 rounded-2xl p-16 text-center text-slate-400 shadow-sm">
-            <Sprout size={48} className="mx-auto text-emerald-500/20 mb-4" />
-            <p className="text-base font-bold">No hay lotes que coincidan con la búsqueda.</p>
+              );
+            })}
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        /* VISTA DE GRID TRADICIONAL */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredLots.length > 0 ? (
+            filteredLots.map(lot => {
+              const days = calculateDaysElapsed(lot.start_date);
+              const progress = Math.min(Math.round((days / 90) * 100), 100);
 
-      {/* Modal para Crear/Editar */}
+              return (
+                <div key={lot.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-slate-300 transition duration-150 flex flex-col justify-between shadow-sm">
+                  <div className="p-6 space-y-5">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900 tracking-tight">{lot.name}</h3>
+                        <span className="text-xs text-emerald-600 font-bold flex items-center gap-1.5 mt-1.5">
+                          <Sprout size={14} />
+                          {lot.strain}
+                        </span>
+                      </div>
+                      <span className="text-xs font-bold px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full">
+                        {lot.stage}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 pt-3 border-t border-slate-100">
+                      <div className="flex items-center gap-2.5 text-sm text-slate-500 font-medium">
+                        <Hash size={16} className="text-slate-400" />
+                        <span>Macetas / Unidades:</span>
+                        <span className="ml-auto text-slate-800 font-bold">{lot.plant_count}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-sm text-slate-500 font-medium">
+                        <Calendar size={16} className="text-slate-400" />
+                        <span>Fecha de carga:</span>
+                        <span className="ml-auto text-slate-800 font-bold">{lot.start_date}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-sm text-slate-500 font-medium">
+                        <Layers size={16} className="text-slate-400" />
+                        <span>En etapa actual:</span>
+                        <span className="ml-auto text-slate-800 font-bold">{days} días</span>
+                      </div>
+                    </div>
+
+                    {lot.notes && (
+                      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1 flex items-center gap-1">
+                          <FileText size={10} /> Notas
+                        </span>
+                        <p className="text-xs text-slate-650 leading-relaxed font-medium truncate">{lot.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Progreso estimado */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs text-slate-400 font-bold">
+                        <span>Progreso estimado del lote</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5">
+                        <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                      </div>
+                    </div>
+
+                    {/* Botonera de acciones específicas */}
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <button
+                        onClick={() => handleOpenTransplantModal(lot)}
+                        className="py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
+                      >
+                        <ArrowRight size={13} />
+                        Rotar/Trasplantar
+                      </button>
+                      <button
+                        onClick={() => handleOpenScheduleModal(lot)}
+                        className="py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-650 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
+                      >
+                        <Calculator size={13} />
+                        Ver Dosificación
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Footer del card */}
+                  <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-between gap-3">
+                    <button
+                      onClick={() => handleOpenEditModal(lot)}
+                      className="flex-1 py-2 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-800 font-bold text-xs rounded-lg border border-slate-200 flex items-center justify-center gap-1.5 transition duration-150 shadow-sm"
+                    >
+                      <Edit3 size={14} />
+                      Editar
+                    </button>
+                    {lot.is_archived ? (
+                      <button
+                        onClick={() => unarchiveLot(lot.id)}
+                        className="flex-1 py-2 bg-white hover:bg-emerald-50 text-emerald-600 font-bold text-xs rounded-lg border border-slate-200 flex items-center justify-center gap-1.5 transition duration-150 shadow-sm"
+                      >
+                        <ArchiveRestore size={14} />
+                        Reactivar
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => archiveLot(lot.id)}
+                        className="flex-1 py-2 bg-white hover:bg-red-50 text-red-600 font-bold text-xs rounded-lg border border-slate-200 flex items-center justify-center gap-1.5 transition duration-150 shadow-sm"
+                      >
+                        <Archive size={14} />
+                        Archivar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="col-span-full bg-white border border-slate-200 rounded-2xl p-16 text-center text-slate-400 shadow-sm">
+              <Sprout size={48} className="mx-auto text-emerald-500/20 mb-4" />
+              <p className="text-base font-bold">No hay lotes que coincidan con la búsqueda.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal para Crear/Editar Estándar */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
@@ -282,7 +470,7 @@ export const LotsView = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 shadow-sm"
-                  placeholder="Ej: Cama 1 de Flora"
+                  placeholder="Ej: Camas 1 y 2 - Clones"
                   required
                 />
               </div>
@@ -312,7 +500,7 @@ export const LotsView = () => {
                     value={plantCount}
                     onChange={(e) => setPlantCount(e.target.value)}
                     className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 shadow-sm"
-                    placeholder="Ej: 4"
+                    placeholder="Ej: 5"
                     min="1"
                     required
                   />
@@ -321,15 +509,15 @@ export const LotsView = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-650 mb-1">Fase de Cultivo</label>
+                  <label className="block text-sm font-semibold text-slate-650 mb-1">Fase / Cama de Cultivo</label>
                   <select
                     value={stage}
-                    onChange={(e) => setStage(e.target.value as typeof stage)}
+                    onChange={(e) => setStage(e.target.value as Lot['stage'])}
                     className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                   >
-                    <option value="Germinación">Germinación</option>
-                    <option value="Vegetativo">Vegetativo</option>
-                    <option value="Floración">Floración</option>
+                    {PIPELINE_COLUMNS.map(col => (
+                      <option key={col.stage} value={col.stage}>{col.label}</option>
+                    ))}
                     <option value="Secado">Secado</option>
                     <option value="Curado">Curado</option>
                   </select>
@@ -361,15 +549,116 @@ export const LotsView = () => {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-200 transition duration-150 animate-in"
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-200 transition"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150 shadow-sm animate-in"
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition shadow-sm"
                 >
                   {editingLot ? 'Guardar Cambios' : 'Crear Lote'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Trasplante / Rotación Perpetua */}
+      {showTransplantModal && transplantLot && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <ArrowRight className="text-emerald-605" size={20} />
+                  Rotar de Cama / Trasplantar
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 font-semibold">Lote: {transplantLot.name} ({transplantLot.plant_count} plantas)</p>
+              </div>
+              <button onClick={() => setShowTransplantModal(false)} className="text-slate-400 hover:text-slate-650 transition text-lg font-bold">
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleConfirmTransplant} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Cama Destino *</label>
+                <select
+                  value={targetStage}
+                  onChange={(e) => {
+                    const stageSelected = e.target.value as Lot['stage'];
+                    setTargetStage(stageSelected);
+                    // Cambiar el volumen por defecto de la maceta según la cama seleccionada
+                    if (stageSelected === 'Cama 3 (Preflora Temprana)') setNewPotSize('1 Litro o 3 Litros');
+                    else if (stageSelected === 'Cama 4 (Preflora Avanzada)') setNewPotSize('3 Litros');
+                    else if (stageSelected === 'Cama 5 (Madres)') setNewPotSize('5 Litros');
+                    else if (stageSelected === 'Cama 6 (Pre-flora)') setNewPotSize('10 Litros');
+                    else if (stageSelected === 'Floración') setNewPotSize('Cama de Flora');
+                  }}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
+                  required
+                >
+                  {PIPELINE_COLUMNS.map(col => (
+                    <option key={col.stage} value={col.stage}>{col.label}</option>
+                  ))}
+                  <option value="Secado">Secado</option>
+                  <option value="Curado">Curado</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Volumen Maceta (L)</label>
+                  <input
+                    type="text"
+                    value={newPotSize}
+                    onChange={(e) => setNewPotSize(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
+                    placeholder="Ej: 10 Litros"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Altura Planta (cm)</label>
+                  <input
+                    type="number"
+                    value={plantHeight}
+                    onChange={(e) => setPlantHeight(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
+                    placeholder="Ej: 75"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Notas del Trasplante</label>
+                <textarea
+                  value={transplantNotes}
+                  onChange={(e) => setTransplantNotes(e.target.value)}
+                  className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-xs shadow-sm"
+                  rows={2}
+                  placeholder="Detalles sobre raíces, micorrizas, podas de raíces..."
+                ></textarea>
+              </div>
+
+              <p className="text-[11px] text-slate-500 leading-normal bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/10">
+                💡 <strong>Automatización:</strong> Al confirmar, se guardará el cambio de cama, se reiniciará el contador de días para esta etapa y se registrará un reporte automático en el diario.
+              </p>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowTransplantModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-200 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition shadow-sm"
+                >
+                  Confirmar Trasplante
                 </button>
               </div>
             </form>
@@ -381,7 +670,7 @@ export const LotsView = () => {
       {showScheduleModal && selectedScheduleLot && (() => {
         const days = calculateDaysElapsed(selectedScheduleLot.start_date);
         const currentWeekIndex = Math.floor(days / 7);
-        const schedule = selectedScheduleLot.stage === 'Vegetativo' ? VEG_SCHEDULE : FLOWER_SCHEDULE;
+        const schedule = selectedScheduleLot.stage === 'Floración' ? FLOWER_SCHEDULE : VEG_SCHEDULE;
 
         // Recuperar los datos de la semana activa en el selector
         const activeWeekData = schedule.find(s => s.week === activeScheduleWeek) || schedule[0];
@@ -401,7 +690,7 @@ export const LotsView = () => {
                     Dosificación: {selectedScheduleLot.name}
                   </h3>
                   <p className="text-xs text-slate-500 font-bold mt-1">
-                    Fase: {selectedScheduleLot.stage} • Variedad: {selectedScheduleLot.strain} • Día {days} de cultivo
+                    Cama: {selectedScheduleLot.stage} • Variedad: {selectedScheduleLot.strain} • Día {days} en esta cama
                   </p>
                 </div>
                 <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-slate-650 transition text-lg font-bold">
@@ -413,7 +702,7 @@ export const LotsView = () => {
               <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/30">
                 {/* 1. Selector de Semanas Stepper Horizontal */}
                 <div className="space-y-2">
-                  <span className="text-[11px] font-bold text-slate-450 block uppercase tracking-wider">Progreso del Ciclo</span>
+                  <span className="text-[11px] font-bold text-slate-450 block uppercase tracking-wider">Semanas del Cronograma Ryanodine</span>
                   <div className="flex items-center justify-between gap-2 overflow-x-auto py-3 px-2 bg-white border border-slate-200 rounded-2xl shadow-sm scrollbar-thin">
                     {schedule.map(s => {
                       const isCurrent = s.week === currentWeekIndex;

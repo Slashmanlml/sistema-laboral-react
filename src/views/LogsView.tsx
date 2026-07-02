@@ -55,10 +55,14 @@ export const LogsView = () => {
   // Guía de Riego en Vivo
   const selectedLotObj = lots.find(l => l.id === lotId);
   let wateringGuide = null;
-  if (selectedLotObj && (selectedLotObj.stage === 'Vegetativo' || selectedLotObj.stage === 'Floración')) {
+  if (selectedLotObj && 
+      selectedLotObj.stage !== 'Cama 5 (Madres)' && 
+      selectedLotObj.stage !== 'Secado' && 
+      selectedLotObj.stage !== 'Curado') {
     const days = calculateDaysElapsed(selectedLotObj.start_date);
     const week = Math.floor(days / 7);
-    const schedule = selectedLotObj.stage === 'Vegetativo' ? VEG_SCHEDULE : FLOWER_SCHEDULE;
+    const isFlower = selectedLotObj.stage === 'Floración';
+    const schedule = isFlower ? FLOWER_SCHEDULE : VEG_SCHEDULE;
     const weekData = schedule.find(s => s.week === week) || schedule[schedule.length - 1]; // Capped at last week
     
     wateringGuide = {

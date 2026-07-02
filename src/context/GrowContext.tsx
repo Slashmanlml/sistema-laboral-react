@@ -29,7 +29,7 @@ const getSeeds = () => {
       name: 'Carpa Vegetativo - Cama 1',
       strain: 'Moby Dick',
       plant_count: 4,
-      stage: 'Vegetativo',
+      stage: 'Cama 1 y 2 (Propagación)',
       start_date: date20DaysAgo,
       notes: 'Sustrato Fibra de Coco con perlita. LED 240W.',
       is_archived: false
@@ -96,7 +96,8 @@ interface GrowContextType {
   addHelper: (name: string) => Promise<void>;
   deleteHelper: (id: string) => Promise<void>;
   uploadPhoto: (file: File) => Promise<string | null>;
-  resetDatabase: () => Promise<void>;
+  clearDatabase: () => Promise<void>;
+  loadDemoData: () => Promise<void>;
 }
 
 const GrowContext = createContext<GrowContextType | undefined>(undefined);
@@ -145,15 +146,10 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (tasksRes.error) throw tasksRes.error;
         if (helpersRes.error) throw helpersRes.error;
 
-        const lotsCount = lotsRes.data?.length || 0;
-        if (lotsCount === 0) {
-          await loadSeedsToSupabase();
-        } else {
-          setStrains(strainsRes.data || []);
-          setLots(lotsRes.data || []);
-          setLogs(logsRes.data || []);
-          setTasks(tasksRes.data || []);
-        }
+        setStrains(strainsRes.data || []);
+        setLots(lotsRes.data || []);
+        setLogs(logsRes.data || []);
+        setTasks(tasksRes.data || []);
         setHelpers(helpersRes.data || []);
       } catch (err) {
         console.error("Error cargando datos de Supabase:", err);
@@ -176,21 +172,36 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (deleteError) throw deleteError;
 
-      // Si no es Vegetativo ni Floración, salimos después de limpiar
-      if (stage !== 'Vegetativo' && stage !== 'Floración') {
+      // 2. Elegir el conjunto de semanas del cronograma según la cama
+      let scheduleWeeks = [];
+      let label = '';
+      if (stage === 'Cama 1 y 2 (Propagación)') {
+        scheduleWeeks = VEG_SCHEDULE.filter(w => w.week === 0 || w.week === 1);
+        label = 'veg';
+      } else if (stage === 'Cama 3 (Preflora Temprana)') {
+        scheduleWeeks = VEG_SCHEDULE.filter(w => w.week === 2 || w.week === 3);
+        label = 'veg';
+      } else if (stage === 'Cama 4 (Preflora Avanzada)') {
+        scheduleWeeks = VEG_SCHEDULE.filter(w => w.week === 4);
+        label = 'veg';
+      } else if (stage === 'Cama 6 (Pre-flora)') {
+        scheduleWeeks = VEG_SCHEDULE.filter(w => w.week === 5);
+        label = 'veg';
+      } else if (stage === 'Floración') {
+        scheduleWeeks = FLOWER_SCHEDULE;
+        label = 'flo';
+      } else {
+        // Para Madres, Secado, Curado, etc. no autogeneramos cronograma
         setTasks(prev => prev.filter(t => !t.id.startsWith(`task_sched_${lotId}_`)));
         return;
       }
 
-      // 2. Elegir el cronograma correspondiente
-      const schedule = stage === 'Vegetativo' ? VEG_SCHEDULE : FLOWER_SCHEDULE;
-
       // 3. Generar tareas (una por semana)
       const start = new Date(startDateStr + 'T00:00:00');
-      const tasksToInsert: Task[] = schedule.map(s => {
-        const taskDate = new Date(start.getTime() + (s.week * 7 * 24 * 60 * 60 * 1000));
+      const tasksToInsert: Task[] = scheduleWeeks.map((s, idx) => {
+        const taskDate = new Date(start.getTime() + (idx * 7 * 24 * 60 * 60 * 1000));
         return {
-          id: `task_sched_${lotId}_${stage === 'Vegetativo' ? 'veg' : 'flo'}_${s.week}`,
+          id: `task_sched_${lotId}_${label}_w${s.week}_${idx}`,
           lot_id: lotId,
           title: `${s.title}`,
           date: taskDate.toISOString().split('T')[0],
@@ -200,8 +211,10 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
       });
 
-      const { error: insertError } = await supabase.from('tasks').insert(tasksToInsert);
-      if (insertError) throw insertError;
+      if (tasksToInsert.length > 0) {
+        const { error: insertError } = await supabase.from('tasks').insert(tasksToInsert);
+        if (insertError) throw insertError;
+      }
 
       // Actualizar estado local
       setTasks(prev => {
@@ -403,7 +416,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const resetDatabase = async () => {
+  const clearDatabase = async () => {
     try {
       await Promise.all([
         supabase.from('strains').delete().neq('id', 'keep_none'),
@@ -412,10 +425,24 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabase.from('tasks').delete().neq('id', 'keep_none'),
         supabase.from('helpers').delete().neq('id', 'keep_none')
       ]);
-      await loadSeedsToSupabase();
+      setStrains([]);
+      setLots([]);
+      setLogs([]);
+      setTasks([]);
       setHelpers([]);
     } catch (err) {
-      console.error("Error al reiniciar base de datos:", err);
+      console.error("Error al vaciar la base de datos:", err);
+    }
+  };
+
+  const loadDemoData = async () => {
+    try {
+      setLoading(true);
+      await loadSeedsToSupabase();
+    } catch (err) {
+      console.error("Error al cargar demo:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -424,7 +451,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       strains, lots, logs, tasks, helpers,
       addLot, editLot, archiveLot, unarchiveLot,
       addLog, deleteLog, addTask, toggleTask, deleteTask,
-      addStrain, deleteStrain, addHelper, deleteHelper, uploadPhoto, resetDatabase
+      addStrain, deleteStrain, addHelper, deleteHelper, uploadPhoto, clearDatabase, loadDemoData
     }}>
       {loading ? (
         <div className="flex min-h-screen bg-slate-50 text-slate-800 items-center justify-center font-sans">
