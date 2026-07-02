@@ -3,6 +3,7 @@ import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed } from '../utils/calculations';
 import type { Lot } from '../types/grow';
 import { Search, Plus, Archive, ArchiveRestore, Edit3, Sprout, Hash, Calendar, Layers, FileText } from 'lucide-react';
+import { VEG_SCHEDULE, FLOWER_SCHEDULE } from '../utils/schedules';
 
 export const LotsView = () => {
   const { lots, strains, addLot, editLot, archiveLot, unarchiveLot } = useGrow();
@@ -11,9 +12,13 @@ export const LotsView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'archived'>('active');
 
-  // Modal
+  // Modal de Edición
   const [showModal, setShowModal] = useState(false);
   const [editingLot, setEditingLot] = useState<Lot | null>(null);
+
+  // Modal de Cronograma
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedScheduleLot, setSelectedScheduleLot] = useState<Lot | null>(null);
 
   // Formulario
   const [name, setName] = useState('');
@@ -55,6 +60,11 @@ export const LotsView = () => {
     setStartDate(lot.start_date);
     setNotes(lot.notes || '');
     setShowModal(true);
+  };
+
+  const handleOpenScheduleModal = (lot: Lot) => {
+    setSelectedScheduleLot(lot);
+    setShowScheduleModal(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -173,7 +183,7 @@ export const LotsView = () => {
                   )}
 
                   {/* Progreso del ciclo */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <div className="flex justify-between text-xs text-gray-500">
                       <span>Progreso estimado (Día {days} / 90)</span>
                       <span>{progress}%</span>
@@ -182,6 +192,17 @@ export const LotsView = () => {
                       <div className="bg-green-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
                     </div>
                   </div>
+
+                  {/* Botón de Cronograma de Riego */}
+                  {(lot.stage === 'Vegetativo' || lot.stage === 'Floración') && (
+                    <button
+                      onClick={() => handleOpenScheduleModal(lot)}
+                      className="w-full py-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 font-semibold text-xs rounded-xl border border-green-500/25 flex items-center justify-center gap-2 transition duration-150"
+                    >
+                      <Calendar size={14} />
+                      Ver Cronograma de Riego
+                    </button>
+                  )}
                 </div>
 
                 {/* Footer del card */}
@@ -333,6 +354,101 @@ export const LotsView = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Cronograma */}
+      {showScheduleModal && selectedScheduleLot && (() => {
+        const days = calculateDaysElapsed(selectedScheduleLot.start_date);
+        const currentWeek = Math.floor(days / 7) + 1;
+        const schedule = selectedScheduleLot.stage === 'Vegetativo' ? VEG_SCHEDULE : FLOWER_SCHEDULE;
+
+        return (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-gray-950 border border-gray-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+              {/* Header */}
+              <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/20">
+                <div>
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Calendar className="text-green-400" size={22} />
+                    Cronograma de Riego: {selectedScheduleLot.name}
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Fase: {selectedScheduleLot.stage} • Iniciado el {selectedScheduleLot.start_date} (Día {days} de cultivo)
+                  </p>
+                </div>
+                <button onClick={() => setShowScheduleModal(false)} className="text-gray-400 hover:text-white transition text-lg font-bold">
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 overflow-y-auto space-y-4 flex-1">
+                <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl text-xs text-gray-400 leading-relaxed">
+                  <strong>Nota sobre fertilización con sales:</strong> Asegúrate de calibrar correctamente tus medidores de pH y EC. Si la EC sube demasiado, realiza riegos de lixiviación o reduce la dosificación.
+                </div>
+
+                <div className="space-y-3">
+                  {schedule.map(s => {
+                    const isCurrent = s.week === currentWeek;
+                    const isPast = s.week < currentWeek;
+
+                    return (
+                      <div 
+                        key={s.week} 
+                        className={`p-4 rounded-xl border transition duration-200 ${
+                          isCurrent 
+                            ? 'bg-green-500/10 border-green-500/40 shadow-md shadow-green-950/20' 
+                            : isPast 
+                              ? 'bg-gray-900/30 border-gray-900 opacity-60' 
+                              : 'bg-gray-900/50 border-gray-900'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-2">
+                          <div>
+                            <span className={`text-xs font-bold uppercase tracking-wider ${isCurrent ? 'text-green-400' : 'text-gray-500'}`}>
+                              Semana {s.week}
+                            </span>
+                            <h4 className="text-sm font-bold text-white mt-0.5">{s.title}</h4>
+                          </div>
+                          {isCurrent && (
+                            <span className="text-[10px] uppercase font-black px-2.5 py-0.5 bg-green-500 text-gray-950 rounded-full">
+                              Semana Actual
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mt-3">
+                          <div className="p-2 bg-gray-950/80 border border-gray-800 rounded-lg text-center">
+                            <span className="text-[10px] text-gray-500 uppercase block font-semibold">pH Objetivo</span>
+                            <span className="text-sm font-bold text-white">{s.ph.toFixed(1)}</span>
+                          </div>
+                          <div className="p-2 bg-gray-950/80 border border-gray-800 rounded-lg text-center">
+                            <span className="text-[10px] text-gray-500 uppercase block font-semibold">EC Objetivo</span>
+                            <span className="text-sm font-bold text-white">{s.ec.toFixed(1)} mS/cm</span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-gray-400 mt-2.5 leading-relaxed font-sans">
+                          {s.notes}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-gray-800 bg-gray-900/10 text-right">
+                <button
+                  onClick={() => setShowScheduleModal(false)}
+                  className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-gray-300 font-semibold rounded-xl border border-gray-800 transition"
+                >
+                  Cerrar Cronograma
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

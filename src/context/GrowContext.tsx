@@ -1,8 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Lot, Log, Task, Strain } from '../types/grow';
+import type { Lot, Log, Task, Strain, Helper } from '../types/grow';
 import { calculateVPD } from '../utils/calculations';
 import { supabase } from '../lib/supabaseClient';
+import { VEG_SCHEDULE, FLOWER_SCHEDULE } from '../utils/schedules';
 
 const getSeeds = () => {
   const suffix = Math.random().toString(36).substring(2, 9) + '_' + Date.now();
@@ -80,18 +81,21 @@ interface GrowContextType {
   lots: Lot[];
   logs: Log[];
   tasks: Task[];
-  addLot: (lot: Omit<Lot, 'id' | 'is_archived'>) => void;
-  editLot: (lot: Lot) => void;
-  archiveLot: (id: string) => void;
-  unarchiveLot: (id: string) => void;
-  addLog: (log: Omit<Log, 'id' | 'date' | 'vpd'>) => void;
-  deleteLog: (id: string) => void;
-  addTask: (task: Omit<Task, 'id' | 'is_completed'>) => void;
-  toggleTask: (id: string) => void;
-  deleteTask: (id: string) => void;
-  addStrain: (strain: Omit<Strain, 'id'>) => void;
-  deleteStrain: (id: string) => void;
-  resetDatabase: () => void;
+  helpers: Helper[];
+  addLot: (lot: Omit<Lot, 'id' | 'is_archived'>) => Promise<void>;
+  editLot: (lot: Lot) => Promise<void>;
+  archiveLot: (id: string) => Promise<void>;
+  unarchiveLot: (id: string) => Promise<void>;
+  addLog: (log: Omit<Log, 'id' | 'date' | 'vpd'>) => Promise<void>;
+  deleteLog: (id: string) => Promise<void>;
+  addTask: (task: Omit<Task, 'id' | 'is_completed'>) => Promise<void>;
+  toggleTask: (id: string) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
+  addStrain: (strain: Omit<Strain, 'id'>) => Promise<void>;
+  deleteStrain: (id: string) => Promise<void>;
+  addHelper: (name: string) => Promise<void>;
+  deleteHelper: (id: string) => Promise<void>;
+  resetDatabase: () => Promise<void>;
 }
 
 const GrowContext = createContext<GrowContextType | undefined>(undefined);
@@ -101,6 +105,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [lots, setLots] = useState<Lot[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [helpers, setHelpers] = useState<Helper[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadSeedsToSupabase = async () => {
@@ -125,17 +130,19 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [strainsRes, lotsRes, logsRes, tasksRes] = await Promise.all([
+        const [strainsRes, lotsRes, logsRes, tasksRes, helpersRes] = await Promise.all([
           supabase.from('strains').select('*'),
           supabase.from('lots').select('*'),
           supabase.from('logs').select('*').order('date', { ascending: false }),
-          supabase.from('tasks').select('*').order('date', { ascending: true })
+          supabase.from('tasks').select('*').order('date', { ascending: true }),
+          supabase.from('helpers').select('*')
         ]);
 
         if (strainsRes.error) throw strainsRes.error;
         if (lotsRes.error) throw lotsRes.error;
         if (logsRes.error) throw logsRes.error;
         if (tasksRes.error) throw tasksRes.error;
+        if (helpersRes.error) throw helpersRes.error;
 
         const lotsCount = lotsRes.data?.length || 0;
         if (lotsCount === 0) {
@@ -146,6 +153,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLogs(logsRes.data || []);
           setTasks(tasksRes.data || []);
         }
+        setHelpers(helpersRes.data || []);
       } catch (err) {
         console.error("Error cargando datos de Supabase:", err);
       } finally {
@@ -155,6 +163,54 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     fetchData();
   }, []);
+
+  // Generador de tareas automático en base al cronograma
+  const generateScheduleTasks = async (lotId: string, stage: string, startDateStr: string) => {
+    try {
+      // 1. Eliminar tareas previas autogeneradas para este lote
+      const { error: deleteError } = await supabase
+        .from('tasks')
+        .delete()
+        .like('id', `task_sched_${lotId}_%`);
+      
+      if (deleteError) throw deleteError;
+
+      // Si no es Vegetativo ni Floración, salimos después de limpiar
+      if (stage !== 'Vegetativo' && stage !== 'Floración') {
+        setTasks(prev => prev.filter(t => !t.id.startsWith(`task_sched_${lotId}_`)));
+        return;
+      }
+
+      // 2. Elegir el cronograma correspondiente
+      const schedule = stage === 'Vegetativo' ? VEG_SCHEDULE : FLOWER_SCHEDULE;
+
+      // 3. Generar tareas (una por semana)
+      const start = new Date(startDateStr + 'T00:00:00');
+      const tasksToInsert: Task[] = schedule.map(s => {
+        const taskDate = new Date(start.getTime() + (s.week * 7 * 24 * 60 * 60 * 1000));
+        return {
+          id: `task_sched_${lotId}_${stage === 'Vegetativo' ? 'veg' : 'flo'}_${s.week}`,
+          lot_id: lotId,
+          title: s.title,
+          date: taskDate.toISOString().split('T')[0],
+          type: 'fertilizante',
+          notes: `pH objetivo: ${s.ph} | EC objetivo: ${s.ec} mS/cm. ${s.notes}`,
+          is_completed: false
+        };
+      });
+
+      const { error: insertError } = await supabase.from('tasks').insert(tasksToInsert);
+      if (insertError) throw insertError;
+
+      // Actualizar estado local
+      setTasks(prev => {
+        const filtered = prev.filter(t => !t.id.startsWith(`task_sched_${lotId}_`));
+        return [...filtered, ...tasksToInsert];
+      });
+    } catch (err) {
+      console.error("Error al generar cronograma de tareas:", err);
+    }
+  };
 
   const addLot = async (lot: Omit<Lot, 'id' | 'is_archived'>) => {
     const newLot: Lot = {
@@ -166,6 +222,9 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.from('lots').insert(newLot);
       if (error) throw error;
       setLots(prev => [...prev, newLot]);
+
+      // Generar tareas semanales
+      await generateScheduleTasks(newLot.id, newLot.stage, newLot.start_date);
     } catch (err) {
       console.error("Error al agregar lote:", err);
     }
@@ -183,6 +242,9 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }).eq('id', updatedLot.id);
       if (error) throw error;
       setLots(prev => prev.map(l => l.id === updatedLot.id ? updatedLot : l));
+
+      // Regenerar cronograma por si cambió la fecha o la fase
+      await generateScheduleTasks(updatedLot.id, updatedLot.stage, updatedLot.start_date);
     } catch (err) {
       console.error("Error al editar lote:", err);
     }
@@ -297,15 +359,41 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const addHelper = async (name: string) => {
+    const newHelper: Helper = {
+      id: 'helper_' + Date.now(),
+      name
+    };
+    try {
+      const { error } = await supabase.from('helpers').insert(newHelper);
+      if (error) throw error;
+      setHelpers(prev => [...prev, newHelper]);
+    } catch (err) {
+      console.error("Error al agregar ayudante:", err);
+    }
+  };
+
+  const deleteHelper = async (id: string) => {
+    try {
+      const { error } = await supabase.from('helpers').delete().eq('id', id);
+      if (error) throw error;
+      setHelpers(prev => prev.filter(h => h.id !== id));
+    } catch (err) {
+      console.error("Error al borrar ayudante:", err);
+    }
+  };
+
   const resetDatabase = async () => {
     try {
       await Promise.all([
         supabase.from('strains').delete().neq('id', 'keep_none'),
         supabase.from('lots').delete().neq('id', 'keep_none'),
         supabase.from('logs').delete().neq('id', 'keep_none'),
-        supabase.from('tasks').delete().neq('id', 'keep_none')
+        supabase.from('tasks').delete().neq('id', 'keep_none'),
+        supabase.from('helpers').delete().neq('id', 'keep_none')
       ]);
       await loadSeedsToSupabase();
+      setHelpers([]);
     } catch (err) {
       console.error("Error al reiniciar base de datos:", err);
     }
@@ -313,10 +401,10 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <GrowContext.Provider value={{
-      strains, lots, logs, tasks,
+      strains, lots, logs, tasks, helpers,
       addLot, editLot, archiveLot, unarchiveLot,
       addLog, deleteLog, addTask, toggleTask, deleteTask,
-      addStrain, deleteStrain, resetDatabase
+      addStrain, deleteStrain, addHelper, deleteHelper, resetDatabase
     }}>
       {loading ? (
         <div className="flex min-h-screen bg-gray-900 text-gray-100 items-center justify-center font-sans">
@@ -335,3 +423,4 @@ export const useGrow = () => {
   if (!context) throw new Error('useGrow debe ser usado dentro de un GrowProvider');
   return context;
 };
+

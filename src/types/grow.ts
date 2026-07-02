@@ -28,6 +28,7 @@ export interface Log {
   ph?: number;
   ec?: number;
   water_amount?: number;
+  watered_by?: string;
   notes?: string;
 }
 
@@ -41,4 +42,11 @@ export interface Task {
   notes?: string;
   is_completed: boolean;
 }
+
+export interface Helper {
+  id: string;
+  user_id?: string;
+  name: string;
+}
+
 

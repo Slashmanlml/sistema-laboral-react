@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGrow } from '../context/GrowContext';
-import { calculateVPD, getVPDInfo } from '../utils/calculations';
+import { calculateVPD, getVPDInfo, calculateDaysElapsed } from '../utils/calculations';
 import { Trash2, Calendar, Activity } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import { VEG_SCHEDULE, FLOWER_SCHEDULE } from '../utils/schedules';
 
 export const LogsView = () => {
-  const { lots, logs, addLog, deleteLog } = useGrow();
+  const { lots, logs, helpers, addLog, deleteLog } = useGrow();
 
   // Inputs del Formulario
   const [lotId, setLotId] = useState('');
@@ -15,6 +17,26 @@ export const LogsView = () => {
   const [water, setWater] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Ayudante / Quién regó
+  const [currentUser, setCurrentUser] = useState('');
+  const [wateredBy, setWateredBy] = useState('');
+
+  // Filtros
+  const [onlyWaterings, setOnlyWaterings] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) {
+        const name = user.email.split('@')[0];
+        setCurrentUser(name);
+        setWateredBy(name);
+      } else {
+        setCurrentUser('José');
+        setWateredBy('José');
+      }
+    });
+  }, []);
+
   const activeLots = lots.filter(l => !l.is_archived);
 
   // Calcular el VPD interactivo directamente en el renderizado
@@ -22,6 +44,25 @@ export const LogsView = () => {
   const h = parseFloat(humidity);
   const vpd = (!isNaN(t) && !isNaN(h)) ? calculateVPD(t, h) : null;
   const vpdDetails = vpd !== null ? getVPDInfo(vpd) : null;
+
+  // Guía de Riego en Vivo
+  const selectedLotObj = lots.find(l => l.id === lotId);
+  let wateringGuide = null;
+  if (selectedLotObj && (selectedLotObj.stage === 'Vegetativo' || selectedLotObj.stage === 'Floración')) {
+    const days = calculateDaysElapsed(selectedLotObj.start_date);
+    const week = Math.floor(days / 7) + 1;
+    const schedule = selectedLotObj.stage === 'Vegetativo' ? VEG_SCHEDULE : FLOWER_SCHEDULE;
+    const weekData = schedule.find(s => s.week === week) || schedule[schedule.length - 1]; // Capped at last week
+    
+    wateringGuide = {
+      week,
+      stage: selectedLotObj.stage,
+      days,
+      ph: weekData.ph,
+      ec: weekData.ec,
+      notes: weekData.notes
+    };
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +75,7 @@ export const LogsView = () => {
       ph: ph ? parseFloat(ph) : undefined,
       ec: ec ? parseFloat(ec) : undefined,
       water_amount: water ? parseFloat(water) : undefined,
+      watered_by: wateredBy || undefined,
       notes: notes || undefined
     });
 
@@ -45,7 +87,16 @@ export const LogsView = () => {
     setEc('');
     setWater('');
     setNotes('');
+    setWateredBy(currentUser || 'José');
   };
+
+  // Aplicar filtros en el historial
+  const filteredLogs = logs.filter(log => {
+    if (onlyWaterings && (!log.water_amount || log.water_amount <= 0)) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto select-none">
@@ -75,10 +126,37 @@ export const LogsView = () => {
                 >
                   <option value="">Selecciona un lote...</option>
                   {activeLots.map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
+                    <option key={l.id} value={l.id}>{l.name} ({l.stage})</option>
                   ))}
                 </select>
               </div>
+
+              {/* Guía Visual en Vivo */}
+              {wateringGuide && (
+                <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-xl space-y-2 animate-in fade-in duration-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-green-400 uppercase tracking-wider">
+                      Guía del Riego Actual
+                    </span>
+                    <span className="text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full border border-green-500/20">
+                      Semana {wateringGuide.week} ({wateringGuide.stage})
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 pt-1">
+                    <div className="p-2.5 bg-gray-900/60 border border-gray-800 rounded-lg text-center">
+                      <span className="text-[10px] text-gray-500 uppercase block font-semibold">pH Ideal</span>
+                      <span className="text-lg font-bold text-white">{wateringGuide.ph.toFixed(1)}</span>
+                    </div>
+                    <div className="p-2.5 bg-gray-900/60 border border-gray-800 rounded-lg text-center">
+                      <span className="text-[10px] text-gray-500 uppercase block font-semibold">EC Ideal</span>
+                      <span className="text-lg font-bold text-white">{wateringGuide.ec.toFixed(1)} mS/cm</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed italic pt-1">
+                    {wateringGuide.notes}
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -153,16 +231,33 @@ export const LogsView = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Cantidad de Agua (Litros / opcional)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={water}
-                  onChange={(e) => setWater(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500"
-                  placeholder="Ej: 10"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Agua (Litros / opcional)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={water}
+                    onChange={(e) => setWater(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500"
+                    placeholder="Ej: 10"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Quién Regó *</label>
+                  <select
+                    value={wateredBy}
+                    onChange={(e) => setWateredBy(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                    required
+                  >
+                    <option value="">Selecciona...</option>
+                    {currentUser && <option value={currentUser}>{currentUser} (Tú)</option>}
+                    {helpers.map(h => (
+                      <option key={h.id} value={h.name}>{h.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -189,11 +284,23 @@ export const LogsView = () => {
         {/* Historial de Registros */}
         <div className="lg:col-span-7">
           <div className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden h-full flex flex-col">
-            <div className="p-6 border-b border-gray-900">
+            <div className="p-6 border-b border-gray-900 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Calendar size={20} className="text-green-400" />
                 Historial de Registros
               </h3>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="onlyWaterings"
+                  checked={onlyWaterings}
+                  onChange={(e) => setOnlyWaterings(e.target.checked)}
+                  className="rounded border-gray-700 bg-gray-900 text-green-500 focus:ring-green-500/50"
+                />
+                <label htmlFor="onlyWaterings" className="text-xs text-gray-400 cursor-pointer select-none">
+                  Ver solo riegos
+                </label>
+              </div>
             </div>
 
             <div className="flex-1 overflow-x-auto">
@@ -205,12 +312,13 @@ export const LogsView = () => {
                     <th className="p-4">Temp/Hum</th>
                     <th className="p-4">VPD</th>
                     <th className="p-4">Riego (pH/EC)</th>
+                    <th className="p-4">Regado Por</th>
                     <th className="p-4 text-center">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-900 text-sm">
-                  {logs.length > 0 ? (
-                    logs.map(log => {
+                  {filteredLogs.length > 0 ? (
+                    filteredLogs.map(log => {
                       const lot = lots.find(l => l.id === log.lot_id);
                       const lotName = lot ? lot.name : 'Lote Desconocido';
                       const vpdInfo = getVPDInfo(log.vpd);
@@ -246,6 +354,7 @@ export const LogsView = () => {
                               <span className="text-gray-600">Sin riego</span>
                             )}
                           </td>
+                          <td className="p-4 text-gray-300 font-medium truncate max-w-[100px]">{log.watered_by || 'José'}</td>
                           <td className="p-4 text-center">
                             <button
                               onClick={() => deleteLog(log.id)}
@@ -260,7 +369,7 @@ export const LogsView = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={6} className="p-12 text-center text-gray-500">
+                      <td colSpan={7} className="p-12 text-center text-gray-500">
                         <Activity size={32} className="mx-auto text-green-500/20 mb-2" />
                         <p>No hay registros diarios guardados aún.</p>
                       </td>
@@ -275,3 +384,4 @@ export const LogsView = () => {
     </div>
   );
 };
+

@@ -36,6 +36,7 @@ create table logs (
   ph numeric,
   ec numeric,
   water_amount numeric,
+  watered_by text,
   notes text
 );
 
@@ -51,64 +52,44 @@ create table tasks (
   is_completed boolean not null default false
 );
 
+-- 5. Crear tabla de ayudantes (helpers)
+create table helpers (
+  id text primary key,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name text not null
+);
+
 -- Habilitar Row Level Security (RLS)
 alter table strains enable row level security;
 alter table lots enable row level security;
 alter table logs enable row level security;
 alter table tasks enable row level security;
+alter table helpers enable row level security;
 
 -- Políticas de aislamiento privado por usuario
 create policy "Acceso privado strains" on strains for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Acceso privado lots" on lots for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Acceso privado logs" on logs for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "Acceso privado tasks" on tasks for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "Acceso privado helpers" on helpers for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 
 -- =========================================================================
 -- SCRIPT DE MIGRACIÓN: EJECUTAR ESTO PARA MIGRAR SI YA TIENES DATOS CREADOS
 -- =========================================================================
 /*
--- 1. Agregar columna user_id a todas las tablas (inicialmente nula)
-alter table strains add column user_id uuid references auth.users(id);
-alter table lots add column user_id uuid references auth.users(id);
-alter table logs add column user_id uuid references auth.users(id);
-alter table tasks add column user_id uuid references auth.users(id);
+-- 1. Crear la tabla de ayudantes (helpers)
+create table helpers (
+  id text primary key,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name text not null
+);
+alter table helpers enable row level security;
+create policy "Acceso privado helpers" on helpers for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- 2. Asignar los datos existentes al usuario José (machadiito78@gmail.com)
--- (El UID corresponde a machadiito78@gmail.com según la consola)
-update strains set user_id = 'c8170021-984c-4be9-93b9-f87e257f33d3' where user_id is null;
-update lots set user_id = 'c8170021-984c-4be9-93b9-f87e257f33d3' where user_id is null;
-update logs set user_id = 'c8170021-984c-4be9-93b9-f87e257f33d3' where user_id is null;
-update tasks set user_id = 'c8170021-984c-4be9-93b9-f87e257f33d3' where user_id is null;
-
--- 3. Hacer que user_id sea NOT NULL y tenga por defecto auth.uid()
-alter table strains alter column user_id set not null;
-alter table strains alter column user_id set default auth.uid();
-
-alter table lots alter column user_id set not null;
-alter table lots alter column user_id set default auth.uid();
-
-alter table logs alter column user_id set not null;
-alter table logs alter column user_id set default auth.uid();
-
-alter table tasks alter column user_id set not null;
-alter table tasks alter column user_id set default auth.uid();
-
--- 4. Eliminar políticas antiguas (si las creaste previamente)
-drop policy if exists "Acceso público strains" on strains;
-drop policy if exists "Acceso público lots" on lots;
-drop policy if exists "Acceso público logs" on logs;
-drop policy if exists "Acceso público tasks" on tasks;
-drop policy if exists "Acceso privado strains" on strains;
-drop policy if exists "Acceso privado lots" on lots;
-drop policy if exists "Acceso privado logs" on logs;
-drop policy if exists "Acceso privado tasks" on tasks;
-
--- 5. Crear políticas de aislamiento por usuario
-create policy "Acceso privado strains" on strains for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "Acceso privado lots" on lots for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "Acceso privado logs" on logs for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "Acceso privado tasks" on tasks for all to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+-- 2. Agregar la columna watered_by a la tabla logs
+alter table logs add column watered_by text;
 */
+
 
 

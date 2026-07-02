@@ -47,6 +47,7 @@ export const DashboardView = () => {
   // Obtener últimas métricas registradas
   const lastLog = logs.length > 0 ? logs[0] : null;
   const vpdInfo = lastLog ? getVPDInfo(lastLog.vpd) : null;
+  const recentWaterings = logs.filter(l => l.water_amount && l.water_amount > 0).slice(0, 5);
 
   // Preparar datos para el gráfico ambiental (últimas 10 mediciones en orden cronológico)
   const sortedLogs = [...logs].slice(0, 10).reverse();
@@ -231,6 +232,56 @@ export const DashboardView = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Monitoreo Diario de Riegos */}
+      <div className="bg-gray-950 border border-gray-800/80 rounded-2xl p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-white">Monitoreo Diario de Riegos</h3>
+          <span className="text-xs text-gray-500">Últimos 5 riegos registrados</span>
+        </div>
+        {recentWaterings.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse select-none">
+              <thead>
+                <tr className="border-b border-gray-900 text-gray-400 text-xs font-semibold uppercase bg-gray-900/25">
+                  <th className="py-3 px-4">Fecha/Hora</th>
+                  <th className="py-3 px-4">Lote</th>
+                  <th className="py-3 px-4">Cantidad de Agua</th>
+                  <th className="py-3 px-4">pH / EC</th>
+                  <th className="py-3 px-4">Quién Regó</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-900 text-sm">
+                {recentWaterings.map(log => {
+                  const lot = lots.find(l => l.id === log.lot_id);
+                  const lotName = lot ? lot.name : 'Lote Desconocido';
+                  const date = new Date(log.date).toLocaleDateString('es-AR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  });
+                  return (
+                    <tr key={log.id} className="hover:bg-gray-900/30 transition">
+                      <td className="py-3.5 px-4 text-gray-300 font-medium">{date}</td>
+                      <td className="py-3.5 px-4 text-green-400 font-semibold">{lotName}</td>
+                      <td className="py-3.5 px-4 text-white font-medium">{log.water_amount} L</td>
+                      <td className="py-3.5 px-4 text-gray-400">
+                        pH: <span className="text-white font-semibold">{log.ph || '-.-'}</span> • EC: <span className="text-white font-semibold">{log.ec || '-.-'} mS/cm</span>
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-300 font-medium">{log.watered_by || 'José'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="py-8 text-center text-gray-500 text-sm">
+            No hay riegos registrados recientemente en el diario.
+          </div>
+        )}
       </div>
 
       {/* Lotes de Cultivo Activos (Sumario) */}

@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useGrow } from '../context/GrowContext';
-import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database } from 'lucide-react';
+import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database, Users } from 'lucide-react';
 
 export const SettingsView = () => {
-  const { strains, lots, logs, tasks, addStrain, deleteStrain, resetDatabase } = useGrow();
+  const { strains, lots, logs, tasks, helpers, addStrain, deleteStrain, addHelper, deleteHelper, resetDatabase } = useGrow();
 
   // Formulario de genética
   const [strainName, setStrainName] = useState('');
   const [strainType, setStrainType] = useState<'Híbrido' | 'Índica' | 'Sativa' | 'CBD'>('Híbrido');
+
+  // Formulario de ayudante
+  const [helperName, setHelperName] = useState('');
 
   const handleAddStrain = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,8 +20,15 @@ export const SettingsView = () => {
     setStrainType('Híbrido');
   };
 
+  const handleAddHelper = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!helperName.trim()) return;
+    addHelper(helperName.trim());
+    setHelperName('');
+  };
+
   const handleExport = () => {
-    const data = { strains, lots, logs, tasks };
+    const data = { strains, lots, logs, tasks, helpers };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -50,73 +60,121 @@ export const SettingsView = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto select-none">
+    <div className="space-y-8 max-w-5xl mx-auto select-none">
       {/* Header */}
       <div>
         <h2 className="text-3xl font-bold text-white tracking-tight">Ajustes y Parámetros</h2>
-        <p className="text-gray-400 mt-1">Configura tu catálogo de genéticas y copias de seguridad.</p>
+        <p className="text-gray-400 mt-1">Configura tu catálogo de genéticas, ayudantes y copias de seguridad.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Gestión de Genéticas */}
-        <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6">
-          <div className="flex items-center gap-2.5 mb-5">
-            <div className="p-2 bg-green-500/10 rounded-xl text-green-400 border border-green-500/20">
-              <Dna size={22} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+        {/* Columna Izquierda: Genéticas y Ayudantes */}
+        <div className="space-y-8">
+          {/* Gestión de Genéticas */}
+          <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6">
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="p-2 bg-green-500/10 rounded-xl text-green-400 border border-green-500/20">
+                <Dna size={22} />
+              </div>
+              <h3 className="text-lg font-bold text-white">Mis Genéticas</h3>
             </div>
-            <h3 className="text-lg font-bold text-white">Mis Genéticas</h3>
+
+            <form onSubmit={handleAddStrain} className="flex gap-3 mb-6">
+              <input
+                type="text"
+                value={strainName}
+                onChange={(e) => setStrainName(e.target.value)}
+                className="flex-1 px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                placeholder="Ej: Gorilla Glue #4"
+                required
+              />
+              <select
+                value={strainType}
+                onChange={(e) => setStrainType(e.target.value as typeof strainType)}
+                className="px-3 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+              >
+                <option value="Híbrido">Híbrido</option>
+                <option value="Índica">Índica</option>
+                <option value="Sativa">Sativa</option>
+                <option value="CBD">CBD</option>
+              </select>
+              <button
+                type="submit"
+                className="p-2.5 bg-green-500 hover:bg-green-600 text-gray-950 rounded-xl transition duration-200"
+              >
+                <Plus size={20} />
+              </button>
+            </form>
+
+            <ul className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {strains.length > 0 ? (
+                strains.map(s => (
+                  <li key={s.id} className="flex items-center justify-between px-4 py-3 bg-gray-900/50 border border-gray-800 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-white">{s.name}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full">{s.type}</span>
+                    </div>
+                    <button
+                      onClick={() => deleteStrain(s.id)}
+                      className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded-lg border border-transparent hover:border-red-500/10 transition"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li className="text-center text-gray-500 text-sm py-6">No hay genéticas registradas.</li>
+              )}
+            </ul>
           </div>
 
-          <form onSubmit={handleAddStrain} className="flex gap-3 mb-6">
-            <input
-              type="text"
-              value={strainName}
-              onChange={(e) => setStrainName(e.target.value)}
-              className="flex-1 px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
-              placeholder="Ej: Gorilla Glue #4"
-              required
-            />
-            <select
-              value={strainType}
-              onChange={(e) => setStrainType(e.target.value as typeof strainType)}
-              className="px-3 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
-            >
-              <option value="Híbrido">Híbrido</option>
-              <option value="Índica">Índica</option>
-              <option value="Sativa">Sativa</option>
-              <option value="CBD">CBD</option>
-            </select>
-            <button
-              type="submit"
-              className="p-2.5 bg-green-500 hover:bg-green-600 text-gray-950 rounded-xl transition duration-200"
-            >
-              <Plus size={20} />
-            </button>
-          </form>
+          {/* Gestión de Ayudantes / Cultivadores */}
+          <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6">
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="p-2 bg-green-500/10 rounded-xl text-green-400 border border-green-500/20">
+                <Users size={22} />
+              </div>
+              <h3 className="text-lg font-bold text-white">Cultivadores / Ayudantes</h3>
+            </div>
 
-          <ul className="space-y-2">
-            {strains.length > 0 ? (
-              strains.map(s => (
-                <li key={s.id} className="flex items-center justify-between px-4 py-3 bg-gray-900/50 border border-gray-800 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-white">{s.name}</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full">{s.type}</span>
-                  </div>
-                  <button
-                    onClick={() => deleteStrain(s.id)}
-                    className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded-lg border border-transparent hover:border-red-500/10 transition"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </li>
-              ))
-            ) : (
-              <li className="text-center text-gray-500 text-sm py-6">No hay genéticas registradas.</li>
-            )}
-          </ul>
+            <form onSubmit={handleAddHelper} className="flex gap-3 mb-6">
+              <input
+                type="text"
+                value={helperName}
+                onChange={(e) => setHelperName(e.target.value)}
+                className="flex-1 px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                placeholder="Nombre del ayudante (Ej: Juan)"
+                required
+              />
+              <button
+                type="submit"
+                className="p-2.5 bg-green-500 hover:bg-green-600 text-gray-950 rounded-xl transition duration-200"
+              >
+                <Plus size={20} />
+              </button>
+            </form>
+
+            <ul className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {helpers && helpers.length > 0 ? (
+                helpers.map(h => (
+                  <li key={h.id} className="flex items-center justify-between px-4 py-3 bg-gray-900/50 border border-gray-800 rounded-xl">
+                    <span className="text-sm font-semibold text-white">{h.name}</span>
+                    <button
+                      onClick={() => deleteHelper(h.id)}
+                      className="p-1.5 hover:bg-red-500/10 text-gray-500 hover:text-red-400 rounded-lg border border-transparent hover:border-red-500/10 transition"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li className="text-center text-gray-500 text-sm py-6">Solo estás tú registrado. Añade ayudantes para registrar quién regó.</li>
+              )}
+            </ul>
+          </div>
         </div>
 
-        {/* Base de Datos y Copias de Seguridad */}
+        {/* Columna Derecha: Base de Datos y Copias de Seguridad */}
         <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6">
           <div className="flex items-center gap-2.5 mb-5">
             <div className="p-2 bg-blue-500/10 rounded-xl text-blue-400 border border-blue-500/20">
@@ -126,7 +184,7 @@ export const SettingsView = () => {
           </div>
 
           <p className="text-xs text-gray-400 mb-6 leading-relaxed">
-            Tus datos se guardan localmente en el navegador. Descarga copias de seguridad periódicamente para evitar pérdidas.
+            Tus datos se guardan de forma privada y segura en tu cuenta de Supabase. Descarga copias de seguridad periódicamente para tu tranquilidad.
           </p>
 
           <div className="space-y-4">
@@ -157,7 +215,7 @@ export const SettingsView = () => {
               <h4 className="text-sm font-bold text-red-400">Zona de Peligro</h4>
             </div>
             <p className="text-xs text-gray-400 mb-4">
-              Esto borrará toda la información del sistema. Esta acción es irreversible.
+              Esto borrará toda la información de tu base de datos en la nube. Esta acción es irreversible.
             </p>
             <button
               onClick={() => {
@@ -176,3 +234,4 @@ export const SettingsView = () => {
     </div>
   );
 };
+
