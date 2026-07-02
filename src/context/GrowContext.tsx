@@ -161,10 +161,26 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchData();
   }, []);
 
-  // Generador de tareas automático en base al cronograma de Ryanodine
+  // Generador de tareas automático con preservación de estado
   const generateScheduleTasks = async (lotId: string, stage: string, startDateStr: string) => {
     try {
-      // 1. Eliminar tareas previas autogeneradas para este lote
+      // 1. Obtener tareas autogeneradas actuales para ver cuáles están completadas
+      const { data: oldTasks } = await supabase
+        .from('tasks')
+        .select('id, is_completed')
+        .like('id', `task_sched_${lotId}_%`);
+      
+      const completedWeeks = new Set<string>();
+      if (oldTasks) {
+        oldTasks.forEach(ot => {
+          if (ot.is_completed) {
+            const match = ot.id.match(/_w(\d+)_/);
+            if (match) completedWeeks.add(match[1]);
+          }
+        });
+      }
+
+      // 2. Eliminar tareas previas autogeneradas para este lote
       const { error: deleteError } = await supabase
         .from('tasks')
         .delete()
@@ -172,7 +188,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (deleteError) throw deleteError;
 
-      // 2. Elegir el conjunto de semanas del cronograma según la cama
+      // 3. Elegir el conjunto de semanas del cronograma según la cama
       let scheduleWeeks = [];
       let label = '';
       if (stage === 'Cama 1 y 2 (Propagación)') {
@@ -196,10 +212,11 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // 3. Generar tareas (una por semana)
+      // 4. Generar tareas (una por semana) preservando is_completed
       const start = new Date(startDateStr + 'T00:00:00');
       const tasksToInsert: Task[] = scheduleWeeks.map((s, idx) => {
         const taskDate = new Date(start.getTime() + (idx * 7 * 24 * 60 * 60 * 1000));
+        const isCompleted = completedWeeks.has(s.week.toString());
         return {
           id: `task_sched_${lotId}_${label}_w${s.week}_${idx}`,
           lot_id: lotId,
@@ -207,7 +224,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
           date: taskDate.toISOString().split('T')[0],
           type: 'fertilizante',
           notes: `pH: ${s.ph} | EC: ${s.ec} mS/cm. Dosis: A: ${s.makroA} ml/L, B: ${s.mikroB} ml/L, C: ${s.calcisC} ml/L. ${s.notes}`,
-          is_completed: false
+          is_completed: isCompleted
         };
       });
 
@@ -237,6 +254,12 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setLots(prev => [...prev, newLot]);
 
+      // Registrar strain automáticamente si no existe en el catálogo
+      const strainExists = strains.some(s => s.name.toLowerCase() === lot.strain.toLowerCase());
+      if (!strainExists && lot.strain.trim()) {
+        await addStrain({ name: lot.strain.trim(), type: 'Híbrido' });
+      }
+
       // Generar tareas semanales
       await generateScheduleTasks(newLot.id, newLot.stage, newLot.start_date);
     } catch (err) {
@@ -249,6 +272,12 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.from('lots').update(lot).eq('id', lot.id);
       if (error) throw error;
       setLots(prev => prev.map(l => l.id === lot.id ? lot : l));
+
+      // Registrar strain automáticamente si no existe en el catálogo
+      const strainExists = strains.some(s => s.name.toLowerCase() === lot.strain.toLowerCase());
+      if (!strainExists && lot.strain.trim()) {
+        await addStrain({ name: lot.strain.trim(), type: 'Híbrido' });
+      }
 
       // Regenerar tareas si cambian fecha o fase
       await generateScheduleTasks(lot.id, lot.stage, lot.start_date);

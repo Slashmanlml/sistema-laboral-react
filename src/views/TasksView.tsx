@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGrow } from '../context/GrowContext';
-import { Trash2, Plus, Calendar, CheckCircle2, Sprout, Filter, ChevronLeft, ChevronRight, List } from 'lucide-react';
+import { Trash2, Plus, Calendar, CheckCircle2, Sprout, Filter, ChevronLeft, ChevronRight, List, Beaker } from 'lucide-react';
 import type { Task } from '../types/grow';
 
 export const TasksView = () => {
   const { tasks, lots, addTask, toggleTask, deleteTask } = useGrow();
+  const navigate = useNavigate();
 
   // Modo de vista: lista o calendario
   const [viewMode, setViewMode] = useState<'lista' | 'calendario'>('calendario');
@@ -88,6 +90,25 @@ export const TasksView = () => {
   const selectedDateTasks = tasks.filter(t => t.date === selectedDate);
 
   const monthName = currentDate.toLocaleString('es-AR', { month: 'long', year: 'numeric' });
+
+  // Riego Rápido
+  const handleQuickWatering = (task: Task) => {
+    let targetPh = '';
+    let targetEc = '';
+
+    const phMatch = task.notes?.match(/pH:\s*([0-9.]+)/i);
+    if (phMatch) targetPh = phMatch[1];
+
+    const ecMatch = task.notes?.match(/EC:\s*([0-9.]+)/i);
+    if (ecMatch) targetEc = ecMatch[1];
+
+    sessionStorage.setItem('quick_log_lot_id', task.lot_id);
+    sessionStorage.setItem('quick_log_ph', targetPh);
+    sessionStorage.setItem('quick_log_ec', targetEc);
+    sessionStorage.setItem('quick_log_task_id', task.id);
+
+    navigate('/logs');
+  };
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto select-none text-slate-700">
@@ -180,7 +201,7 @@ export const TasksView = () => {
                     <select
                       value={type}
                       onChange={(e) => setType(e.target.value as Task['type'])}
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-850 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-855 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                     >
                       <option value="riego">Riego</option>
                       <option value="fertilizante">Nutrientes</option>
@@ -308,7 +329,7 @@ export const TasksView = () => {
                                 task.type === 'fertilizante' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                 task.type === 'poda' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' :
                                 task.type === 'preventivo' ? 'bg-red-50 text-red-650 border border-red-100' :
-                                'bg-slate-50 text-slate-600 border border-slate-100';
+                                'bg-slate-50 text-slate-650 border border-slate-100';
 
                               return (
                                 <div
@@ -345,6 +366,7 @@ export const TasksView = () => {
                     selectedDateTasks.map(task => {
                       const lot = lots.find(l => l.id === task.lot_id);
                       const lotName = lot ? lot.name : 'Lote Desconocido';
+                      const isWateringTask = task.type === 'riego' || task.type === 'fertilizante';
 
                       return (
                         <div key={task.id} className={`py-4 first:pt-0 last:pb-0 flex items-start gap-4 ${task.is_completed ? 'opacity-50' : ''}`}>
@@ -352,10 +374,10 @@ export const TasksView = () => {
                             type="checkbox"
                             checked={task.is_completed}
                             onChange={() => toggleTask(task.id)}
-                            className="mt-1.5 rounded border-slate-305 bg-white text-emerald-600 focus:ring-emerald-500/50 cursor-pointer"
+                            className="mt-1.5 rounded border-slate-300 bg-white text-emerald-600 focus:ring-emerald-500/50 cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">
-                            <h4 className={`text-sm font-bold ${task.is_completed ? 'line-through text-slate-405 font-medium' : 'text-slate-850'}`}>
+                            <h4 className={`text-sm font-bold ${task.is_completed ? 'line-through text-slate-400 font-medium' : 'text-slate-800'}`}>
                               {task.title}
                             </h4>
                             {task.notes && (
@@ -367,12 +389,24 @@ export const TasksView = () => {
                                 {lotName}
                               </span>
                               <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                                task.type === 'riego' ? 'bg-blue-50 text-blue-600 border border-blue-105' :
-                                task.type === 'fertilizante' ? 'bg-emerald-50 text-emerald-600 border border-emerald-105' :
-                                task.type === 'poda' ? 'bg-yellow-50 text-yellow-600 border border-yellow-105' :
-                                task.type === 'preventivo' ? 'bg-red-50 text-red-650 border border-red-105' :
-                                'bg-slate-50 text-slate-650 border border-slate-105'
+                                task.type === 'riego' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                task.type === 'fertilizante' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                task.type === 'poda' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' :
+                                task.type === 'preventivo' ? 'bg-red-50 text-red-650 border border-red-100' :
+                                'bg-slate-50 text-slate-650 border border-slate-100'
                               }`}>{task.type}</span>
+                              
+                              {/* Riego Rápido desde Calendario */}
+                              {isWateringTask && !task.is_completed && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickWatering(task)}
+                                  className="flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 hover:text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-0.5 transition shadow-sm"
+                                >
+                                  <Beaker size={10} />
+                                  Registrar Riego
+                                </button>
+                              )}
                             </div>
                           </div>
                           <button
@@ -425,6 +459,7 @@ export const TasksView = () => {
                       day: 'numeric',
                       month: 'short'
                     });
+                    const isWateringTask = task.type === 'riego' || task.type === 'fertilizante';
 
                     return (
                       <div key={task.id} className={`p-5 hover:bg-slate-50/50 transition ${task.is_completed ? 'opacity-60' : ''}`}>
@@ -433,10 +468,10 @@ export const TasksView = () => {
                             type="checkbox"
                             checked={task.is_completed}
                             onChange={() => toggleTask(task.id)}
-                            className="mt-1.5 rounded border-slate-350 bg-white text-emerald-600 focus:ring-emerald-500/50 cursor-pointer"
+                            className="mt-1.5 rounded border-slate-300 bg-white text-emerald-600 focus:ring-emerald-500/50 cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">
-                            <h4 className={`text-sm font-bold ${task.is_completed ? 'line-through text-slate-405 font-medium' : 'text-slate-800'}`}>
+                            <h4 className={`text-sm font-bold ${task.is_completed ? 'line-through text-slate-400 font-medium' : 'text-slate-800'}`}>
                               {task.title}
                             </h4>
                             {task.notes && (
@@ -452,12 +487,24 @@ export const TasksView = () => {
                                 {lotName}
                               </span>
                               <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                                task.type === 'riego' ? 'bg-blue-50 text-blue-600 border border-blue-105' :
-                                task.type === 'fertilizante' ? 'bg-emerald-50 text-emerald-600 border border-emerald-105' :
-                                task.type === 'poda' ? 'bg-yellow-50 text-yellow-600 border border-yellow-105' :
-                                task.type === 'preventivo' ? 'bg-red-50 text-red-650 border border-red-105' :
-                                'bg-slate-50 text-slate-600 border border-slate-105'
+                                task.type === 'riego' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                task.type === 'fertilizante' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                task.type === 'poda' ? 'bg-yellow-50 text-yellow-600 border border-yellow-100' :
+                                task.type === 'preventivo' ? 'bg-red-50 text-red-650 border border-red-100' :
+                                'bg-slate-50 text-slate-605 border border-slate-100'
                               }`}>{task.type}</span>
+
+                              {/* Riego Rápido desde Lista */}
+                              {isWateringTask && !task.is_completed && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickWatering(task)}
+                                  className="flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 hover:text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1 transition shadow-sm"
+                                >
+                                  <Beaker size={10} />
+                                  Registrar Riego
+                                </button>
+                              )}
                             </div>
                           </div>
                           <button
