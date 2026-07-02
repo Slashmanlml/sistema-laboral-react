@@ -271,17 +271,20 @@ export const LotsView = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">Genética / Variedad *</label>
-                  <select
+                  <input
+                    type="text"
+                    list="strains-datalist"
                     value={strain}
                     onChange={(e) => setStrain(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                    placeholder="Ej: Moby Dick o mezcla"
                     required
-                  >
-                    <option value="">Selecciona...</option>
+                  />
+                  <datalist id="strains-datalist">
                     {strains.map(s => (
-                      <option key={s.id} value={s.name}>{s.name}</option>
+                      <option key={s.id} value={s.name} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">Cantidad de Plantas *</label>

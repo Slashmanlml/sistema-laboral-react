@@ -27,10 +27,13 @@ export interface Log {
   vpd: number;
   ph?: number;
   ec?: number;
+  ph_runoff?: number;
+  ec_runoff?: number;
   water_amount?: number;
   watered_by?: string;
   notes?: string;
 }
+
 
 export interface Task {
   id: string;

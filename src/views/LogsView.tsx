@@ -14,6 +14,8 @@ export const LogsView = () => {
   const [humidity, setHumidity] = useState('');
   const [ph, setPh] = useState('');
   const [ec, setEc] = useState('');
+  const [phRunoff, setPhRunoff] = useState('');
+  const [ecRunoff, setEcRunoff] = useState('');
   const [water, setWater] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -74,6 +76,8 @@ export const LogsView = () => {
       humidity: parseFloat(humidity),
       ph: ph ? parseFloat(ph) : undefined,
       ec: ec ? parseFloat(ec) : undefined,
+      ph_runoff: phRunoff ? parseFloat(phRunoff) : undefined,
+      ec_runoff: ecRunoff ? parseFloat(ecRunoff) : undefined,
       water_amount: water ? parseFloat(water) : undefined,
       watered_by: wateredBy || undefined,
       notes: notes || undefined
@@ -85,6 +89,8 @@ export const LogsView = () => {
     setHumidity('');
     setPh('');
     setEc('');
+    setPhRunoff('');
+    setEcRunoff('');
     setWater('');
     setNotes('');
     setWateredBy(currentUser || 'José');
@@ -111,7 +117,7 @@ export const LogsView = () => {
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-gray-950 border border-gray-800 rounded-2xl p-6">
             <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2">
-              <Activity size={20} className="text-green-400" />
+              <Activity size={20} className="text-emerald-400" />
               Registrar Medición
             </h3>
 
@@ -121,7 +127,7 @@ export const LogsView = () => {
                 <select
                   value={lotId}
                   onChange={(e) => setLotId(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                  className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 text-sm"
                   required
                 >
                   <option value="">Selecciona un lote...</option>
@@ -133,12 +139,12 @@ export const LogsView = () => {
 
               {/* Guía Visual en Vivo */}
               {wateringGuide && (
-                <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-xl space-y-2 animate-in fade-in duration-200">
+                <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl space-y-2 animate-in fade-in duration-200">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-green-400 uppercase tracking-wider">
+                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
                       Guía del Riego Actual
                     </span>
-                    <span className="text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full border border-green-500/20">
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">
                       Semana {wateringGuide.week} ({wateringGuide.stage})
                     </span>
                   </div>
@@ -166,7 +172,7 @@ export const LogsView = () => {
                     step="0.1"
                     value={temp}
                     onChange={(e) => setTemp(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500"
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500"
                     placeholder="Ej: 24.5"
                     required
                   />
@@ -177,7 +183,7 @@ export const LogsView = () => {
                     type="number"
                     value={humidity}
                     onChange={(e) => setHumidity(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500"
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500"
                     placeholder="Ej: 55"
                     required
                   />
@@ -206,40 +212,73 @@ export const LogsView = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">pH de Riego (opcional)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={ph}
-                    onChange={(e) => setPh(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500"
-                    placeholder="Ej: 6.2"
-                  />
+              {/* Parámetros de Riego (Entrada) */}
+              <div className="p-4 bg-gray-900/30 border border-gray-800 rounded-xl space-y-3">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">1. Agua y Nutrientes (Entrada)</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">pH de Riego</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={ph}
+                      onChange={(e) => setPh(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-800 rounded-lg text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      placeholder="Ej: 6.2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">EC de Riego (mS/cm)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={ec}
+                      onChange={(e) => setEc(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-800 rounded-lg text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      placeholder="Ej: 1.4"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">EC de Riego (opcional)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={ec}
-                    onChange={(e) => setEc(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500"
-                    placeholder="Ej: 1.2"
-                  />
+              </div>
+
+              {/* Parámetros de Drenaje (Runoff/Salida) */}
+              <div className="p-4 bg-gray-900/30 border border-gray-800 rounded-xl space-y-3">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">2. Retorno / Drenaje (Runoff)</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">pH Drenaje</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={phRunoff}
+                      onChange={(e) => setPhRunoff(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-800 rounded-lg text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      placeholder="Ej: 6.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-gray-500 mb-1">EC Drenaje (mS/cm)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={ecRunoff}
+                      onChange={(e) => setEcRunoff(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-800 rounded-lg text-white focus:outline-none focus:border-emerald-500 text-sm"
+                      placeholder="Ej: 1.8"
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Agua (Litros / opcional)</label>
+                  <label className="block text-sm font-medium text-gray-400 mb-1">Agua (L / opcional)</label>
                   <input
                     type="number"
                     step="0.1"
                     value={water}
                     onChange={(e) => setWater(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500"
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500"
                     placeholder="Ej: 10"
                   />
                 </div>
@@ -248,7 +287,7 @@ export const LogsView = () => {
                   <select
                     value={wateredBy}
                     onChange={(e) => setWateredBy(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500 text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500 text-sm"
                     required
                   >
                     <option value="">Selecciona...</option>
@@ -265,15 +304,15 @@ export const LogsView = () => {
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-green-500"
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-emerald-500"
                   rows={2}
-                  placeholder="Ej: Defoliación ligera, aparición de resina, etc."
+                  placeholder="Ej: Runoff un poco alto, subir lixiviación."
                 ></textarea>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 bg-green-500 hover:bg-green-600 text-gray-950 font-bold rounded-xl transition duration-200 mt-2"
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold rounded-xl transition duration-200 mt-2"
               >
                 Guardar Registro
               </button>
@@ -286,7 +325,7 @@ export const LogsView = () => {
           <div className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden h-full flex flex-col">
             <div className="p-6 border-b border-gray-900 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Calendar size={20} className="text-green-400" />
+                <Calendar size={20} className="text-emerald-400" />
                 Historial de Registros
               </h3>
               <div className="flex items-center gap-2">
@@ -295,7 +334,7 @@ export const LogsView = () => {
                   id="onlyWaterings"
                   checked={onlyWaterings}
                   onChange={(e) => setOnlyWaterings(e.target.checked)}
-                  className="rounded border-gray-700 bg-gray-900 text-green-500 focus:ring-green-500/50"
+                  className="rounded border-gray-700 bg-gray-900 text-emerald-500 focus:ring-emerald-500/50"
                 />
                 <label htmlFor="onlyWaterings" className="text-xs text-gray-400 cursor-pointer select-none">
                   Ver solo riegos
@@ -311,7 +350,8 @@ export const LogsView = () => {
                     <th className="p-4">Lote</th>
                     <th className="p-4">Temp/Hum</th>
                     <th className="p-4">VPD</th>
-                    <th className="p-4">Riego (pH/EC)</th>
+                    <th className="p-4">Riego (Entrada)</th>
+                    <th className="p-4">Runoff (Salida)</th>
                     <th className="p-4">Regado Por</th>
                     <th className="p-4 text-center">Acción</th>
                   </tr>
@@ -333,7 +373,7 @@ export const LogsView = () => {
                       return (
                         <tr key={log.id} className="hover:bg-gray-900/30 transition">
                           <td className="p-4 text-gray-300 font-medium">{formattedDate}</td>
-                          <td className="p-4 text-green-400 font-semibold truncate max-w-[120px]">{lotName}</td>
+                          <td className="p-4 text-emerald-400 font-semibold truncate max-w-[120px]">{lotName}</td>
                           <td className="p-4 text-gray-400">
                             <span className="text-white font-medium">{log.temp.toFixed(1)}°C</span> / {log.humidity}%
                           </td>
@@ -354,6 +394,16 @@ export const LogsView = () => {
                               <span className="text-gray-600">Sin riego</span>
                             )}
                           </td>
+                          <td className="p-4 text-xs text-gray-400 leading-normal">
+                            {log.ph_runoff || log.ec_runoff ? (
+                              <div>
+                                <span className="block text-emerald-400 font-medium">Runoff</span>
+                                <span>pH: {log.ph_runoff || '-.-'} • EC: {log.ec_runoff || '-.-'}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-600">Sin medir</span>
+                            )}
+                          </td>
                           <td className="p-4 text-gray-300 font-medium truncate max-w-[100px]">{log.watered_by || 'José'}</td>
                           <td className="p-4 text-center">
                             <button
@@ -369,8 +419,8 @@ export const LogsView = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={7} className="p-12 text-center text-gray-500">
-                        <Activity size={32} className="mx-auto text-green-500/20 mb-2" />
+                      <td colSpan={8} className="p-12 text-center text-gray-500">
+                        <Activity size={32} className="mx-auto text-emerald-500/20 mb-2" />
                         <p>No hay registros diarios guardados aún.</p>
                       </td>
                     </tr>
@@ -384,4 +434,3 @@ export const LogsView = () => {
     </div>
   );
 };
-

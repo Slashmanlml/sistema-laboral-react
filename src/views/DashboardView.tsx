@@ -247,8 +247,9 @@ export const DashboardView = () => {
                 <tr className="border-b border-gray-900 text-gray-400 text-xs font-semibold uppercase bg-gray-900/25">
                   <th className="py-3 px-4">Fecha/Hora</th>
                   <th className="py-3 px-4">Lote</th>
-                  <th className="py-3 px-4">Cantidad de Agua</th>
-                  <th className="py-3 px-4">pH / EC</th>
+                  <th className="py-3 px-4">Agua</th>
+                  <th className="py-3 px-4">Riego (Entrada)</th>
+                  <th className="py-3 px-4">Drenaje (Runoff)</th>
                   <th className="py-3 px-4">Quién Regó</th>
                 </tr>
               </thead>
@@ -265,10 +266,19 @@ export const DashboardView = () => {
                   return (
                     <tr key={log.id} className="hover:bg-gray-900/30 transition">
                       <td className="py-3.5 px-4 text-gray-300 font-medium">{date}</td>
-                      <td className="py-3.5 px-4 text-green-400 font-semibold">{lotName}</td>
+                      <td className="py-3.5 px-4 text-emerald-400 font-semibold">{lotName}</td>
                       <td className="py-3.5 px-4 text-white font-medium">{log.water_amount} L</td>
                       <td className="py-3.5 px-4 text-gray-400">
                         pH: <span className="text-white font-semibold">{log.ph || '-.-'}</span> • EC: <span className="text-white font-semibold">{log.ec || '-.-'} mS/cm</span>
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-400">
+                        {log.ph_runoff || log.ec_runoff ? (
+                          <>
+                            pH: <span className="text-emerald-400 font-semibold">{log.ph_runoff || '-.-'}</span> • EC: <span className="text-emerald-400 font-semibold">{log.ec_runoff || '-.-'} mS/cm</span>
+                          </>
+                        ) : (
+                          <span className="text-gray-550 italic text-xs">Sin medir</span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-gray-300 font-medium">{log.watered_by || 'José'}</td>
                     </tr>
