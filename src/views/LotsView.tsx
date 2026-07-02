@@ -202,7 +202,7 @@ export const LotsView = () => {
             <button
               onClick={() => setViewType('pipeline')}
               className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                viewType === 'pipeline' ? 'bg-white text-emerald-605 shadow-sm border border-slate-200/50' : 'text-slate-555 hover:text-slate-800'
+                viewType === 'pipeline' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'
               }`}
               title="Vista de Rotación Perpetua"
             >
@@ -212,7 +212,7 @@ export const LotsView = () => {
             <button
               onClick={() => setViewType('grid')}
               className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                viewType === 'grid' ? 'bg-white text-emerald-655 shadow-sm border border-slate-200/50' : 'text-slate-555 hover:text-slate-800'
+                viewType === 'grid' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'
               }`}
               title="Vista de Lotes"
             >

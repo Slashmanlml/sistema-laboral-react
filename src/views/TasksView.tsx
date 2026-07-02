@@ -103,7 +103,7 @@ export const TasksView = () => {
             <button
               onClick={() => setViewMode('calendario')}
               className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                viewMode === 'calendario' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-555 hover:text-slate-800'
+                viewMode === 'calendario' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'
               }`}
               title="Vista de Calendario"
             >
@@ -113,7 +113,7 @@ export const TasksView = () => {
             <button
               onClick={() => setViewMode('lista')}
               className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                viewMode === 'lista' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-555 hover:text-slate-800'
+                viewMode === 'lista' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800'
               }`}
               title="Vista de Lista"
             >

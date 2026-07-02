@@ -249,7 +249,7 @@ export const LogsView = () => {
                 <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">1. Agua y Nutrientes (Entrada)</span>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[11px] text-slate-550 mb-1 font-semibold">pH de Riego</label>
+                    <label className="block text-[11px] text-slate-500 mb-1 font-semibold">pH de Riego</label>
                     <input
                       type="number"
                       step="0.1"
@@ -260,7 +260,7 @@ export const LogsView = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-550 mb-1 font-semibold">EC de Riego (mS/cm)</label>
+                    <label className="block text-[11px] text-slate-500 mb-1 font-semibold">EC de Riego (mS/cm)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -278,7 +278,7 @@ export const LogsView = () => {
                 <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">2. Retorno / Drenaje (Runoff)</span>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[11px] text-slate-550 mb-1 font-semibold">pH Drenaje</label>
+                    <label className="block text-[11px] text-slate-500 mb-1 font-semibold">pH Drenaje</label>
                     <input
                       type="number"
                       step="0.1"
@@ -289,7 +289,7 @@ export const LogsView = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-550 mb-1 font-semibold">EC Drenaje (mS/cm)</label>
+                    <label className="block text-[11px] text-slate-500 mb-1 font-semibold">EC Drenaje (mS/cm)</label>
                     <input
                       type="number"
                       step="0.01"
@@ -312,7 +312,7 @@ export const LogsView = () => {
                     type="file"
                     accept="image/*"
                     onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-55 file:text-emerald-700 hover:file:bg-emerald-100 transition cursor-pointer"
+                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 transition cursor-pointer"
                   />
                 </div>
               </div>

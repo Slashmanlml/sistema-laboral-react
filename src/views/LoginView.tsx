@@ -74,7 +74,7 @@ export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
         {/* Formulario */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-550 mb-1.5">Correo Electrónico</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Correo Electrónico</label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
                 <Mail size={18} />
@@ -83,7 +83,7 @@ export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-555 text-sm transition duration-150 shadow-sm"
+                className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 text-sm transition duration-150 shadow-sm"
                 placeholder="ejemplo@correo.com"
                 required
               />
@@ -91,7 +91,7 @@ export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-550 mb-1.5">Contraseña</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Contraseña</label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
                 <Lock size={18} />
@@ -100,7 +100,7 @@ export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-11 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-555 text-sm transition duration-150 shadow-sm"
+                className="w-full pl-11 pr-11 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500 text-sm transition duration-150 shadow-sm"
                 placeholder="••••••••"
                 required
               />
