@@ -1,12 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useGrow } from '../context/GrowContext';
-import { calculateVPD, getVPDInfo, calculateDaysElapsed } from '../utils/calculations';
+import { 
+  calculateVPD, 
+  getVPDInfo, 
+  calculateDaysElapsed, 
+  getAthenaRunoffTargets 
+} from '../utils/calculations';
 import { Trash2, Calendar, Activity, Image as ImageIcon, Camera, AlertTriangle, Info } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
-import { VEG_SCHEDULE, FLOWER_SCHEDULE } from '../utils/schedules';
+import { 
+  VEG_SCHEDULE, 
+  FLOWER_SCHEDULE, 
+  ATHENA_PRO_VEG_SCHEDULE, 
+  ATHENA_PRO_FLOWER_SCHEDULE, 
+  ATHENA_BLENDED_VEG_SCHEDULE, 
+  ATHENA_BLENDED_FLOWER_SCHEDULE 
+} from '../utils/schedules';
 
 export const LogsView = () => {
-  const { lots, logs, helpers, addLog, deleteLog, uploadPhoto, toggleTask } = useGrow();
+  const { 
+    lots, logs, helpers, addLog, deleteLog, uploadPhoto, toggleTask,
+    activeNutrientLine, irrigationMethod
+  } = useGrow();
 
   // Inputs del Formulario
   const [lotId, setLotId] = useState('');
@@ -80,8 +95,14 @@ export const LogsView = () => {
     const days = calculateDaysElapsed(selectedLotObj.start_date);
     const rawWeek = Math.floor(days / 7);
     const isFlower = selectedLotObj.stage === 'Floración';
-    const schedule = isFlower ? FLOWER_SCHEDULE : VEG_SCHEDULE;
-    // FLOWER_SCHEDULE starts at week 1, VEG at week 0
+    
+    let schedule = isFlower ? FLOWER_SCHEDULE : VEG_SCHEDULE;
+    if (activeNutrientLine === 'athena_pro') {
+      schedule = isFlower ? ATHENA_PRO_FLOWER_SCHEDULE : ATHENA_PRO_VEG_SCHEDULE;
+    } else if (activeNutrientLine === 'athena_blended') {
+      schedule = isFlower ? ATHENA_BLENDED_FLOWER_SCHEDULE : ATHENA_BLENDED_VEG_SCHEDULE;
+    }
+
     const weekNum = isFlower ? Math.max(rawWeek + 1, 1) : rawWeek;
     const weekData = schedule.find(s => s.week === weekNum) || schedule[0];
     
@@ -497,6 +518,132 @@ export const LogsView = () => {
               </button>
             </form>
           </div>
+
+          {/* Asistente de Riego y Escorrentía Athena */}
+          {selectedLotObj && (activeNutrientLine === 'athena_pro' || activeNutrientLine === 'athena_blended') && (() => {
+            const days = calculateDaysElapsed(selectedLotObj.start_date);
+            const rawWeek = Math.floor(days / 7);
+            const isFlower = selectedLotObj.stage === 'Floración';
+            const weekNum = isFlower ? Math.max(rawWeek + 1, 1) : rawWeek;
+            const targets = getAthenaRunoffTargets(selectedLotObj.stage, weekNum, activeNutrientLine);
+
+            const parsedInputEC = parseFloat(ec);
+            const parsedRunoffEC = parseFloat(ecRunoff);
+            const parsedInputPH = parseFloat(ph);
+            const parsedRunoffPH = parseFloat(phRunoff);
+
+            const deltaEC = (!isNaN(parsedInputEC) && !isNaN(parsedRunoffEC)) ? parsedRunoffEC - parsedInputEC : null;
+
+            return (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2">
+                  <span className="p-2 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
+                    <Activity size={20} />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800">Asistente de Riego Athena</h3>
+                    <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">Metodología: {irrigationMethod === 'manual' ? 'Riego Manual por Peso' : 'Riego Automático'}</p>
+                  </div>
+                </div>
+
+                {/* 1. Indicaciones de Riego basadas en el método */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs font-semibold text-slate-650 leading-relaxed shadow-xs">
+                  <span className="text-[10px] uppercase font-extrabold text-slate-500 block tracking-wider">Estrategia sugerida para {selectedLotObj.stage}</span>
+                  {irrigationMethod === 'manual' ? (
+                    <p>
+                      💡 <strong>Athena Riego Manual:</strong> Regá una sola vez por la mañana (primeras 2 horas de encendido) apuntando a un <strong>10% - 25% de escorrentía</strong> para barrer sales. Antes de regar, levantá la maceta: si se siente pesada, <u>no regues</u> para evitar la asfixia radicular.
+                    </p>
+                  ) : (
+                    <p>
+                      💡 <strong>Athena Riego Automático:</strong> Iniciá fase P1 a las 1-2 horas de encender luces. Usá micro-disparos (2-6% de volumen de maceta) cada 15-30 minutos hasta lograr drenaje. {selectedLotObj.stage === 'Floración' && weekNum <= 3 ? 'No uses disparos de mantenimiento (P2) al final del día para permitir un secado nocturno grande (40-50%).' : 'Añadí eventos P2 para sostener la humedad.'}
+                    </p>
+                  )}
+                </div>
+
+                {/* 2. Objetivos de Escorrentía y Secado Semanales */}
+                <div className="grid grid-cols-2 gap-3.5 pt-1">
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center shadow-xs">
+                    <span className="text-[9px] text-slate-400 uppercase block font-bold tracking-wider mb-0.5">Drenaje EC Objetivo</span>
+                    <span className="text-base font-black text-slate-900">{targets.minEC.toFixed(1)} - {targets.maxEC.toFixed(1)} <span className="text-xs font-bold text-slate-500">mS/cm</span></span>
+                  </div>
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center shadow-xs">
+                    <span className="text-[9px] text-slate-400 uppercase block font-bold tracking-wider mb-0.5">Secado diario (Dryback)</span>
+                    <span className="text-base font-black text-slate-900">{targets.dryback} <span className="text-xs font-bold text-slate-500">WC</span></span>
+                  </div>
+                </div>
+
+                {/* 3. Diagnóstico en Tiempo Real de Escorrentía */}
+                {(!isNaN(parsedRunoffEC) || !isNaN(parsedRunoffPH)) && (
+                  <div className="p-4 border border-slate-200 rounded-xl space-y-3.5 animate-in slide-in-from-top duration-150">
+                    <span className="text-[10px] uppercase font-extrabold text-slate-500 block tracking-wider">Diagnóstico en tiempo real</span>
+
+                    {/* Alerta de EC Drenaje */}
+                    {!isNaN(parsedRunoffEC) && (() => {
+                      const isHigh = parsedRunoffEC > targets.maxEC;
+                      const isLow = parsedRunoffEC < targets.minEC;
+                      
+                      let title = 'EC en rango ideal';
+                      let desc = 'La acumulación de sales en el sustrato se encuentra estable.';
+                      let borderClass = 'border-emerald-100 bg-emerald-50 text-emerald-800';
+
+                      if (isHigh) {
+                        title = '⚠️ Acumulación de sales alta';
+                        desc = irrigationMethod === 'manual'
+                          ? 'El drenaje superó el objetivo. Mañana dale un riego manual levemente más abundante para aumentar la escorrentía (lixiviar) y lavar sales.'
+                          : 'La EC del sustrato está alta. Aumentá el volumen de disparo en P1 para forzar más escorrentía.';
+                        borderClass = 'border-amber-200 bg-amber-50 text-amber-800';
+                      } else if (isLow) {
+                        title = '✓ Absorción acelerada';
+                        desc = irrigationMethod === 'manual'
+                          ? 'EC baja en drenaje. Podés regar con un volumen ligeramente menor mañana (menor escorrentía) para acumular sales nutricionales.'
+                          : 'EC del sustrato baja. Disminuí el volumen del disparo o la escorrentía (apilamiento de sales).';
+                        borderClass = 'border-blue-100 bg-blue-50/50 text-blue-800';
+                      }
+
+                      return (
+                        <div className={`p-3 border rounded-xl text-xs font-semibold leading-relaxed ${borderClass}`}>
+                          <strong className="font-extrabold block text-sm mb-0.5">{title}</strong>
+                          {desc}
+                          {deltaEC !== null && (
+                            <span className="block mt-1.5 font-bold text-[10px] uppercase">
+                              Delta EC (Drenaje - Entrada): <strong className={deltaEC > 1.0 ? 'text-amber-700' : 'text-slate-650'}>{deltaEC > 0 ? `+${deltaEC.toFixed(2)}` : deltaEC.toFixed(2)} mS/cm</strong>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Alerta de pH Drenaje */}
+                    {!isNaN(parsedRunoffPH) && (() => {
+                      const isRot = !isNaN(parsedInputPH) && (parsedRunoffPH < parsedInputPH);
+                      const isHealthy = !isNaN(parsedInputPH) && (parsedRunoffPH >= parsedInputPH && parsedRunoffPH <= parsedInputPH + 0.5);
+
+                      let title = 'pH del drenaje estable';
+                      let desc = 'El pH se mantiene en parámetros equilibrados.';
+                      let borderClass = 'border-emerald-100 bg-emerald-50 text-emerald-800';
+
+                      if (isRot) {
+                        title = '⚠️ Alerta: Raíces ahogadas / Falta de oxígeno';
+                        desc = 'El pH de escorrentía es inferior al de entrada. Indica encharcamiento prolongado. Dejá secar el medio y no riegues mañana si la maceta sigue pesada.';
+                        borderClass = 'border-red-200 bg-red-50 text-red-800';
+                      } else if (isHealthy) {
+                        title = '✓ Metabolismo saludable';
+                        desc = 'El pH es ligeramente superior al de entrada (+0.1 a +0.4), indicando una transpiración y absorción radicular saludable.';
+                        borderClass = 'border-emerald-100 bg-emerald-50 text-emerald-800';
+                      }
+
+                      return (
+                        <div className={`p-3 border rounded-xl text-xs font-semibold leading-relaxed ${borderClass}`}>
+                          <strong className="font-extrabold block text-sm mb-0.5">{title}</strong>
+                          {desc}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Historial de Registros */}

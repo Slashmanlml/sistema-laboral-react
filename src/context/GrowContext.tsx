@@ -3,7 +3,14 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Lot, Log, Task, Strain, Helper } from '../types/grow';
 import { calculateVPD } from '../utils/calculations';
 import { supabase } from '../lib/supabaseClient';
-import { VEG_SCHEDULE, FLOWER_SCHEDULE } from '../utils/schedules';
+import { 
+  VEG_SCHEDULE, 
+  FLOWER_SCHEDULE, 
+  ATHENA_PRO_VEG_SCHEDULE, 
+  ATHENA_PRO_FLOWER_SCHEDULE, 
+  ATHENA_BLENDED_VEG_SCHEDULE, 
+  ATHENA_BLENDED_FLOWER_SCHEDULE 
+} from '../utils/schedules';
 
 const getSeeds = () => {
   const suffix = Math.random().toString(36).substring(2, 9) + '_' + Date.now();
@@ -99,6 +106,10 @@ interface GrowContextType {
   clearDatabase: () => Promise<void>;
   loadDemoData: () => Promise<void>;
   importDatabase: (data: any) => Promise<void>;
+  activeNutrientLine: 'ryanodine' | 'athena_pro' | 'athena_blended';
+  setActiveNutrientLine: (line: 'ryanodine' | 'athena_pro' | 'athena_blended') => Promise<void>;
+  irrigationMethod: 'manual' | 'automated';
+  setIrrigationMethod: (method: 'manual' | 'automated') => void;
 }
 
 const GrowContext = createContext<GrowContextType | undefined>(undefined);
@@ -110,6 +121,14 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [tasks, setTasks] = useState<Task[]>([]);
   const [helpers, setHelpers] = useState<Helper[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Estados de Configuración Athena
+  const [activeNutrientLine, setActiveNutrientLineState] = useState<'ryanodine' | 'athena_pro' | 'athena_blended'>(
+    (localStorage.getItem('activeNutrientLine') as any) || 'ryanodine'
+  );
+  const [irrigationMethod, setIrrigationMethodState] = useState<'manual' | 'automated'>(
+    (localStorage.getItem('irrigationMethod') as any) || 'manual'
+  );
 
   const loadSeedsToSupabase = async () => {
     const seeds = getSeeds();
@@ -163,8 +182,15 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Generador de tareas automático con preservación de estado
-  const generateScheduleTasks = async (lotId: string, stage: string, startDateStr: string) => {
+  const generateScheduleTasks = async (
+    lotId: string, 
+    stage: string, 
+    startDateStr: string,
+    overrideLine?: 'ryanodine' | 'athena_pro' | 'athena_blended'
+  ) => {
     try {
+      const currentLine = overrideLine || activeNutrientLine;
+
       // 1. Obtener tareas autogeneradas actuales para ver cuáles están completadas
       const { data: oldTasks } = await supabase
         .from('tasks')
@@ -190,14 +216,26 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (deleteError) throw deleteError;
 
       // 3. Elegir el conjunto de semanas del cronograma según la etapa
-      let scheduleWeeks = [];
+      let scheduleWeeks: any[] = [];
       let label = '';
       if (stage === 'Vegetativo') {
-        scheduleWeeks = VEG_SCHEDULE;
         label = 'veg';
+        if (currentLine === 'athena_pro') {
+          scheduleWeeks = ATHENA_PRO_VEG_SCHEDULE;
+        } else if (currentLine === 'athena_blended') {
+          scheduleWeeks = ATHENA_BLENDED_VEG_SCHEDULE;
+        } else {
+          scheduleWeeks = VEG_SCHEDULE;
+        }
       } else if (stage === 'Floración') {
-        scheduleWeeks = FLOWER_SCHEDULE;
         label = 'flo';
+        if (currentLine === 'athena_pro') {
+          scheduleWeeks = ATHENA_PRO_FLOWER_SCHEDULE;
+        } else if (currentLine === 'athena_blended') {
+          scheduleWeeks = ATHENA_BLENDED_FLOWER_SCHEDULE;
+        } else {
+          scheduleWeeks = FLOWER_SCHEDULE;
+        }
       } else {
         // Para Germinación, Secado, Curado, etc. no autogeneramos cronograma de fertilizantes
         setTasks(prev => prev.filter(t => !t.id.startsWith(`task_sched_${lotId}_`)));
@@ -209,13 +247,25 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const tasksToInsert: Task[] = scheduleWeeks.map((s, idx) => {
         const taskDate = new Date(start.getTime() + (idx * 7 * 24 * 60 * 60 * 1000));
         const isCompleted = completedWeeks.has(s.week.toString());
+        
+        let dosisText = '';
+        if (currentLine === 'athena_pro') {
+          const isFade = s.week === 8;
+          dosisText = `Pro Bloom: ${s.makroA} g/10L, ${isFade ? 'Fade' : 'Pro Core'}: ${s.mikroB} ${isFade ? 'mL' : 'g'}/10L, Cleanse: ${s.calcisC} mL/10L`;
+        } else if (currentLine === 'athena_blended') {
+          const suffixDose = s.title.toLowerCase().includes('veg') ? 'Grow A & B' : 'Bloom A & B';
+          dosisText = `${suffixDose}: ${s.makroA} mL/10L, CaMg / PK: ${s.calcisC} mL/10L, Cleanse: 0.8 mL/L`;
+        } else {
+          dosisText = `A: ${s.makroA} ml/L, B: ${s.mikroB} ml/L, C: ${s.calcisC} ml/L`;
+        }
+
         return {
           id: `task_sched_${lotId}_${label}_w${s.week}_${idx}`,
           lot_id: lotId,
           title: `${s.title}`,
           date: taskDate.toISOString().split('T')[0],
           type: 'fertilizante',
-          notes: `pH: ${s.ph} | EC: ${s.ec} mS/cm. Dosis: A: ${s.makroA} ml/L, B: ${s.mikroB} ml/L, C: ${s.calcisC} ml/L. ${s.notes}`,
+          notes: `pH: ${s.ph} | EC: ${s.ec} mS/cm. Dosis: ${dosisText}. ${s.notes}`,
           is_completed: isCompleted
         };
       });
@@ -233,6 +283,20 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error("Error al generar cronograma de tareas:", err);
     }
+  };
+
+  const setActiveNutrientLine = async (line: 'ryanodine' | 'athena_pro' | 'athena_blended') => {
+    setActiveNutrientLineState(line);
+    localStorage.setItem('activeNutrientLine', line);
+    // Regenerar las tareas de todos los lotes no archivados
+    for (const lot of lots.filter(l => !l.is_archived)) {
+      await generateScheduleTasks(lot.id, lot.stage, lot.start_date, line);
+    }
+  };
+
+  const setIrrigationMethod = (method: 'manual' | 'automated') => {
+    setIrrigationMethodState(method);
+    localStorage.setItem('irrigationMethod', method);
   };
 
   const addLot = async (lot: Omit<Lot, 'id' | 'is_archived'>) => {
@@ -510,7 +574,9 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addLot, editLot, archiveLot, unarchiveLot,
       addLog, deleteLog, addTask, toggleTask, deleteTask,
       addStrain, deleteStrain, addHelper, deleteHelper, uploadPhoto, clearDatabase, loadDemoData,
-      importDatabase
+      importDatabase,
+      activeNutrientLine, setActiveNutrientLine,
+      irrigationMethod, setIrrigationMethod
     }}>
       {loading ? (
         <div className="flex min-h-screen bg-slate-50 text-slate-800 items-center justify-center font-sans">

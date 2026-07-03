@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGrow } from '../context/GrowContext';
-import { calculateDaysElapsed, getVPDInfo } from '../utils/calculations';
+import { calculateDaysElapsed, getVPDInfo, getAthenaClimateTargets } from '../utils/calculations';
 import { Thermometer, Droplets, Wind, Sprout, Plus, Calendar, CheckCircle2, Dna, Image as ImageIcon } from 'lucide-react';
 import { getLunarInfo, LUNAR_DAY_META, LUNAR_PHASE_META } from '../utils/lunar';
 import { Line } from 'react-chartjs-2';
@@ -28,7 +28,10 @@ ChartJS.register(
 );
 
 export const DashboardView = () => {
-  const { lots, logs, tasks, toggleTask, addLog } = useGrow();
+  const { 
+    lots, logs, tasks, toggleTask, addLog, 
+    activeNutrientLine
+  } = useGrow();
   const [showQuickLog, setShowQuickLog] = useState(false);
   const [activePhotoUrl, setActivePhotoUrl] = useState<string | null>(null);
 
@@ -50,6 +53,14 @@ export const DashboardView = () => {
   const lastLog = logs.length > 0 ? logs[0] : null;
   const vpdInfo = lastLog ? getVPDInfo(lastLog.vpd) : null;
   const recentWaterings = logs.filter(l => l.water_amount && l.water_amount > 0).slice(0, 5);
+
+  // Objetivos de Clima Athena basados en el lote del último registro
+  const lastLogLot = lastLog ? lots.find(l => l.id === lastLog.lot_id) : null;
+  const lastLogDays = lastLogLot ? calculateDaysElapsed(lastLogLot.start_date) : 0;
+  const lastLogWeek = lastLogLot?.stage === 'Floración' ? Math.max(Math.floor(lastLogDays / 7) + 1, 1) : Math.floor(lastLogDays / 7);
+  const athenaClimate = (lastLogLot && (activeNutrientLine === 'athena_pro' || activeNutrientLine === 'athena_blended'))
+    ? getAthenaClimateTargets(lastLogLot.stage, lastLogWeek)
+    : null;
 
   // Preparar datos para el gráfico ambiental (últimas 10 mediciones en orden cronológico)
   const sortedLogs = [...logs].slice(0, 10).reverse();
@@ -194,21 +205,61 @@ export const DashboardView = () => {
           icon={<Thermometer size={24} />}
           title="Última Temperatura"
           value={lastLog ? `${lastLog.temp.toFixed(1)} °C` : '--.- °C'}
-          subtext={lastLog ? (lastLog.temp > 28 ? 'Caluroso' : lastLog.temp < 18 ? 'Frío' : 'Ideal') : 'Sin datos'}
+          subtext={
+            lastLog
+              ? athenaClimate
+                ? lastLog.temp > athenaClimate.maxTemp
+                  ? `⚠️ Caluroso (Athena Máx: ${athenaClimate.maxTemp}°C)`
+                  : lastLog.temp < athenaClimate.minTemp
+                    ? `⚠️ Frío (Athena Mín: ${athenaClimate.minTemp}°C)`
+                    : `✓ Rango Ideal (${athenaClimate.minTemp}-${athenaClimate.maxTemp}°C)`
+                : lastLog.temp > 28
+                  ? 'Caluroso'
+                  : lastLog.temp < 18
+                    ? 'Frío'
+                    : 'Ideal'
+              : 'Sin datos'
+          }
           theme="blue"
         />
         <MetricCard
           icon={<Droplets size={24} />}
           title="Última Humedad"
           value={lastLog ? `${lastLog.humidity}%` : '--%'}
-          subtext={lastLog ? (lastLog.humidity > 75 ? 'Húmedo' : lastLog.humidity < 40 ? 'Seco' : 'Adecuado') : 'Sin datos'}
+          subtext={
+            lastLog
+              ? athenaClimate
+                ? lastLog.humidity > athenaClimate.maxRH
+                  ? `⚠️ Húmedo (Athena Máx: ${athenaClimate.maxRH}%)`
+                  : lastLog.humidity < athenaClimate.minRH
+                    ? `⚠️ Seco (Athena Mín: ${athenaClimate.minRH}%)`
+                    : `✓ Rango Ideal (${athenaClimate.minRH}-${athenaClimate.maxRH}%)`
+                : lastLog.humidity > 75
+                  ? 'Húmedo'
+                  : lastLog.humidity < 40
+                    ? 'Seco'
+                    : 'Adecuado'
+              : 'Sin datos'
+          }
           theme="green"
         />
         <MetricCard
           icon={<Wind size={24} />}
           title="Último VPD"
           value={lastLog ? `${lastLog.vpd.toFixed(2)} kPa` : '-.-- kPa'}
-          subtext={vpdInfo ? vpdInfo.label : 'Sin datos'}
+          subtext={
+            lastLog
+              ? athenaClimate
+                ? lastLog.vpd > athenaClimate.maxVPD
+                  ? `⚠️ VPD Alto (Athena Máx: ${athenaClimate.maxVPD})`
+                  : lastLog.vpd < athenaClimate.minVPD
+                    ? `⚠️ VPD Bajo (Athena Mín: ${athenaClimate.minVPD})`
+                    : `✓ VPD Ideal (${athenaClimate.minVPD}-${athenaClimate.maxVPD} kPa)`
+                : vpdInfo
+                  ? vpdInfo.label
+                  : 'Sin datos'
+              : 'Sin datos'
+          }
           badgeClass={vpdInfo ? vpdInfo.statusClass : ''}
           theme="amber"
         />

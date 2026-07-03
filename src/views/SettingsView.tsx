@@ -3,7 +3,13 @@ import { useGrow } from '../context/GrowContext';
 import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database, Users } from 'lucide-react';
 
 export const SettingsView = () => {
-  const { strains, lots, logs, tasks, helpers, addStrain, deleteStrain, addHelper, deleteHelper, clearDatabase, loadDemoData, importDatabase } = useGrow();
+  const { 
+    strains, lots, logs, tasks, helpers, 
+    addStrain, deleteStrain, addHelper, deleteHelper, 
+    clearDatabase, loadDemoData, importDatabase,
+    activeNutrientLine, setActiveNutrientLine,
+    irrigationMethod, setIrrigationMethod 
+  } = useGrow();
 
   // Formulario de genética
   const [strainName, setStrainName] = useState('');
@@ -174,6 +180,47 @@ export const SettingsView = () => {
                 <li className="text-center text-slate-400 text-sm py-6 font-medium">Solo estás tú registrado. Añade ayudantes para registrar quién regó.</li>
               )}
             </ul>
+          </div>
+
+          {/* Configuración del Cultivo (Metodología Athena) */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
+                <Dna size={22} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">Metodología y Nutrientes</h3>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium">
+              Elegí qué línea de fertilizantes estás usando y tu método de riego. El sistema adaptará las recetas, dosis, alertas de VPD y el diagnóstico de escorrentía automáticamente.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Línea de Nutrientes</label>
+                <select
+                  value={activeNutrientLine}
+                  onChange={(e) => setActiveNutrientLine(e.target.value as any)}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm font-bold shadow-xs cursor-pointer"
+                >
+                  <option value="ryanodine">Sales Ryanodine (Sales Nacionales Coco)</option>
+                  <option value="athena_pro">Athena Pro Line (Solubles Secos - Gr/10L)</option>
+                  <option value="athena_blended">Athena Blended Line (Sales Líquidas - mL/10L)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Método de Riego</label>
+                <select
+                  value={irrigationMethod}
+                  onChange={(e) => setIrrigationMethod(e.target.value as any)}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm font-bold shadow-xs cursor-pointer"
+                >
+                  <option value="manual">Riego Manual (Un riego abundante por la mañana + pesaje)</option>
+                  <option value="automated">Riego Automático (Eventos múltiples P1/P2/P3)</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
