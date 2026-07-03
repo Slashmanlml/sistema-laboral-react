@@ -7,6 +7,7 @@ import { LogsView } from './views/LogsView';
 import { TasksView } from './views/TasksView';
 import { SettingsView } from './views/SettingsView';
 import { LoginView } from './views/LoginView';
+import { ReportsView } from './views/ReportsView';
 import { GrowProvider } from './context/GrowContext';
 import { Menu, Sprout } from 'lucide-react';
 import { supabase } from './lib/supabaseClient';
@@ -77,6 +78,7 @@ function App() {
                 <Route path="/lots" element={<LotsView />} />
                 <Route path="/logs" element={<LogsView />} />
                 <Route path="/tasks" element={<TasksView />} />
+                <Route path="/reports" element={<ReportsView />} />
                 <Route path="/settings" element={<SettingsView />} />
               </Routes>
             </main>

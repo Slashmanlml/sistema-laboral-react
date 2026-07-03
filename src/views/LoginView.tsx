@@ -65,7 +65,7 @@ export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
 
         {/* Error Message */}
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 text-red-650 text-sm rounded-xl flex items-start gap-2.5">
+          <div className="p-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl flex items-start gap-2.5">
             <AlertCircle size={18} className="shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>

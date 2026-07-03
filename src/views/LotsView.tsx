@@ -6,7 +6,7 @@ import { Search, Plus, Archive, ArchiveRestore, Edit3, Sprout, Hash, Calendar, L
 import { VEG_SCHEDULE, FLOWER_SCHEDULE } from '../utils/schedules';
 
 export const LotsView = () => {
-  const { lots, strains, addLot, editLot, archiveLot, unarchiveLot, addLog } = useGrow();
+  const { lots, strains, logs, addLot, editLot, archiveLot, unarchiveLot, addLog } = useGrow();
 
   // Filtros y Vistas
   const [searchTerm, setSearchTerm] = useState('');
@@ -169,10 +169,14 @@ export const LotsView = () => {
 
     await editLot(updatedLot);
 
+    const lastLog = logs.find(l => l.lot_id === transplantLot.id) || logs[0];
+    const currentTemp = lastLog ? lastLog.temp : 24.0;
+    const currentHumidity = lastLog ? lastLog.humidity : 50.0;
+
     await addLog({
       lot_id: transplantLot.id,
-      temp: 24.5,
-      humidity: 55,
+      temp: currentTemp,
+      humidity: currentHumidity,
       notes: `TRASPLANTE: Movido a la etapa de ${targetStage}. Nueva Maceta: ${newPotSize}.${plantHeight ? ` Altura: ${plantHeight} cm.` : ''} ${transplantNotes ? ` Detalle: ${transplantNotes}` : ''}`
     });
 
@@ -270,7 +274,7 @@ export const LotsView = () => {
                         const days = calculateDaysElapsed(lot.start_date);
                         const isWaterable = lot.stage === 'Vegetativo' || lot.stage === 'Floración';
                         return (
-                          <div key={lot.id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm hover:border-slate-350 transition duration-150 space-y-3">
+                          <div key={lot.id} className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm hover:border-slate-300 transition duration-150 space-y-3">
                             <div>
                               <div className="flex justify-between items-start">
                                 <h5 className="font-extrabold text-slate-900 text-sm truncate">{lot.name}</h5>
@@ -278,7 +282,7 @@ export const LotsView = () => {
                                   {lot.plant_count}p
                                 </span>
                               </div>
-                              <span className="text-[11px] text-emerald-650 font-bold block truncate mt-1">
+                              <span className="text-[11px] text-emerald-600 font-bold block truncate mt-1">
                                 {lot.strain}
                               </span>
                             </div>
@@ -374,7 +378,7 @@ export const LotsView = () => {
                         <span className="text-[10px] font-bold text-slate-400 block uppercase mb-1 flex items-center gap-1">
                           <FileText size={10} /> Notas
                         </span>
-                        <p className="text-xs text-slate-650 leading-relaxed font-medium truncate">{lot.notes}</p>
+                        <p className="text-xs text-slate-600 leading-relaxed font-medium truncate">{lot.notes}</p>
                       </div>
                     )}
 
@@ -401,7 +405,7 @@ export const LotsView = () => {
                       {isWaterable ? (
                         <button
                           onClick={() => handleOpenScheduleModal(lot)}
-                          className="py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-655 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
+                          className="py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition"
                         >
                           <Calculator size={13} />
                           Ver Dosificación
@@ -434,7 +438,7 @@ export const LotsView = () => {
                     ) : (
                       <button
                         onClick={() => archiveLot(lot.id)}
-                        className="flex-1 py-2 bg-white hover:bg-red-50 text-red-650 font-bold text-xs rounded-lg border border-slate-200 flex items-center justify-center gap-1.5 transition duration-150 shadow-sm"
+                        className="flex-1 py-2 bg-white hover:bg-red-50 text-red-600 font-bold text-xs rounded-lg border border-slate-200 flex items-center justify-center gap-1.5 transition duration-150 shadow-sm"
                       >
                         <Archive size={14} />
                         Archivar
@@ -461,13 +465,13 @@ export const LotsView = () => {
               <h3 className="text-xl font-bold text-slate-900">
                 {editingLot ? 'Editar Lote de Cultivo' : 'Crear Nuevo Lote'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-650 transition text-lg font-bold">
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 transition text-lg font-bold">
                 ✕
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-650 mb-1">Nombre del Lote / Sala *</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Nombre del Lote / Sala *</label>
                 <input
                   type="text"
                   value={name}
@@ -480,7 +484,7 @@ export const LotsView = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-650 mb-1">Genética / Variedad *</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Genética / Variedad *</label>
                   <input
                     type="text"
                     list="strains-datalist"
@@ -497,7 +501,7 @@ export const LotsView = () => {
                   </datalist>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-655 mb-1">Cantidad de Plantas *</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Cantidad de Plantas *</label>
                   <input
                     type="number"
                     value={plantCount}
@@ -512,7 +516,7 @@ export const LotsView = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-655 mb-1">Etapa de Cultivo</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Etapa de Cultivo</label>
                   <select
                     value={stage}
                     onChange={(e) => setStage(e.target.value as Lot['stage'])}
@@ -524,7 +528,7 @@ export const LotsView = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-655 mb-1">Fecha de Inicio *</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Fecha de Inicio *</label>
                   <input
                     type="date"
                     value={startDate}
@@ -536,7 +540,7 @@ export const LotsView = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-655 mb-1">Notas del Lote</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Notas del Lote</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -578,7 +582,7 @@ export const LotsView = () => {
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 font-semibold">Lote: {transplantLot.name} ({transplantLot.plant_count} plantas)</p>
               </div>
-              <button onClick={() => setShowTransplantModal(false)} className="text-slate-400 hover:text-slate-650 transition text-lg font-bold">
+              <button onClick={() => setShowTransplantModal(false)} className="text-slate-400 hover:text-slate-600 transition text-lg font-bold">
                 ✕
               </button>
             </div>
@@ -678,7 +682,7 @@ export const LotsView = () => {
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150 select-none">
             <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
               {/* Header */}
-              <div className="p-6 border-b border-slate-150 flex justify-between items-center bg-slate-50/50">
+              <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
                 <div>
                   <h3 className="text-xl font-extrabold text-slate-900 flex items-center gap-2.5">
                     <Beaker className="text-emerald-600" size={24} />
@@ -688,7 +692,7 @@ export const LotsView = () => {
                     Etapa: {selectedScheduleLot.stage} • Variedad: {selectedScheduleLot.strain} • Día {days} en esta etapa
                   </p>
                 </div>
-                <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-slate-650 transition text-lg font-bold">
+                <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-slate-600 transition text-lg font-bold">
                   ✕
                 </button>
               </div>
@@ -697,7 +701,7 @@ export const LotsView = () => {
               <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/30">
                 {/* 1. Selector de Semanas Stepper Horizontal */}
                 <div className="space-y-2">
-                  <span className="text-[11px] font-bold text-slate-450 block uppercase tracking-wider">Semanas del Cronograma Ryanodine</span>
+                  <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">Semanas del Cronograma Ryanodine</span>
                   <div className="flex items-center justify-between gap-2 overflow-x-auto py-3 px-2 bg-white border border-slate-200 rounded-2xl shadow-sm scrollbar-thin">
                     {schedule.map(s => {
                       const isCurrent = s.week === currentWeekIndex;
@@ -836,7 +840,7 @@ export const LotsView = () => {
                       })}
                     </div>
 
-                    <div className="text-[10px] text-slate-450 leading-relaxed font-medium pt-3 space-y-1">
+                    <div className="text-[10px] text-slate-500 leading-relaxed font-medium pt-3 space-y-1">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 bg-emerald-500 rounded" />
                         <span>Semana seleccionada para dosificación</span>
@@ -851,7 +855,7 @@ export const LotsView = () => {
               </div>
 
               {/* Footer */}
-              <div className="p-6 border-t border-slate-150 bg-slate-50/50 text-right">
+              <div className="p-6 border-t border-slate-200 bg-slate-50/50 text-right">
                 <button
                   onClick={() => setShowScheduleModal(false)}
                   className="px-5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 font-bold rounded-xl border border-slate-200 transition shadow-sm text-sm"

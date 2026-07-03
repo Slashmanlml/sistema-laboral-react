@@ -31,6 +31,7 @@ export const LogsView = () => {
 
   // Filtros
   const [onlyWaterings, setOnlyWaterings] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleECBlur = (val: string, setter: (v: string) => void) => {
     const num = parseFloat(val);
@@ -77,13 +78,15 @@ export const LogsView = () => {
   let wateringGuide = null;
   if (selectedLotObj && (selectedLotObj.stage === 'Vegetativo' || selectedLotObj.stage === 'Floración')) {
     const days = calculateDaysElapsed(selectedLotObj.start_date);
-    const week = Math.floor(days / 7);
+    const rawWeek = Math.floor(days / 7);
     const isFlower = selectedLotObj.stage === 'Floración';
     const schedule = isFlower ? FLOWER_SCHEDULE : VEG_SCHEDULE;
-    const weekData = schedule.find(s => s.week === week) || schedule[schedule.length - 1]; // Capped at last week
+    // FLOWER_SCHEDULE starts at week 1, VEG at week 0
+    const weekNum = isFlower ? Math.max(rawWeek + 1, 1) : rawWeek;
+    const weekData = schedule.find(s => s.week === weekNum) || schedule[0];
     
     wateringGuide = {
-      week,
+      week: weekNum,
       stage: selectedLotObj.stage,
       days,
       ph: weekData.ph,
@@ -174,6 +177,9 @@ export const LogsView = () => {
       setNotes('');
       removePhoto();
       setWateredBy(currentUser || 'José');
+      
+      setSuccessMessage('¡Registro diario guardado con éxito!');
+      setTimeout(() => setSuccessMessage(null), 3000);
 
     } catch (err) {
       console.error("Error al guardar registro diario:", err);
@@ -210,7 +216,13 @@ export const LogsView = () => {
   const hasAnyWarning = Object.values(warnings).some(w => w !== null);
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto select-none text-slate-750">
+    <div className="space-y-8 max-w-7xl mx-auto select-none text-slate-700 relative">
+      {successMessage && (
+        <div className="fixed bottom-6 right-6 bg-slate-900 border border-slate-800 text-emerald-400 font-extrabold text-sm py-3 px-5 rounded-2xl shadow-xl flex items-center gap-2.5 animate-in slide-in-from-bottom duration-200 z-50">
+          <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+          {successMessage}
+        </div>
+      )}
       {/* Header */}
       <div>
         <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Registro Diario</h2>
@@ -232,7 +244,7 @@ export const LogsView = () => {
                 <select
                   value={lotId}
                   onChange={(e) => setLotId(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-805 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                   required
                 >
                   <option value="">Selecciona un lote...</option>
@@ -244,7 +256,7 @@ export const LogsView = () => {
 
               {/* Guía Visual en Vivo */}
               {wateringGuide && (
-                <div className="p-4 bg-emerald-55/10 border border-emerald-500/20 rounded-xl space-y-2 animate-in fade-in duration-200">
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-2 animate-in fade-in duration-200">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
                       <Info size={14} /> Guía del Riego Actual
@@ -301,7 +313,7 @@ export const LogsView = () => {
               {/* Tarjeta interactiva de cálculo de VPD */}
               <div className={`p-4 rounded-xl border transition-all duration-300 ${
                 vpdDetails 
-                  ? 'bg-slate-50 border-slate-250 shadow-sm' 
+                  ? 'bg-slate-50 border-slate-300 shadow-sm' 
                   : 'bg-slate-50/50 border-slate-200 border-dashed'
               }`}>
                 <div className="flex justify-between items-center mb-1">
@@ -337,15 +349,17 @@ export const LogsView = () => {
                     {warnings.ph && <p className="text-[9px] text-amber-600 font-bold mt-1">{warnings.ph}</p>}
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1 font-bold">EC Riego (mS/cm)</label>
+                    <label className="block text-[11px] text-slate-500 mb-1 font-bold">EC Riego <span className="text-slate-400 font-normal">(mS/cm o μS)</span></label>
                     <input
-                      type="number"
-                      step="0.01"
-                      onChange={(e) => setEc(e.target.value)}
+                      type="text"
+                      inputMode="decimal"
+                      value={ec}
+                      onChange={(e) => setEc(e.target.value.replace(/[^0-9.]/g, ''))}
                       onBlur={() => handleECBlur(ec, setEc)}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
-                      placeholder="Ej: 1.4"
+                      placeholder="Ej: 1.4 o 1400"
                     />
+                    {ec && parseFloat(ec) >= 10 && <p className="text-[9px] text-emerald-600 font-bold mt-1">→ Se guardará como {(parseFloat(ec) / 1000).toFixed(2)} mS/cm</p>}
                     {warnings.ec && <p className="text-[9px] text-amber-600 font-bold mt-1">{warnings.ec}</p>}
                   </div>
                 </div>
@@ -368,15 +382,17 @@ export const LogsView = () => {
                     {warnings.phRO && <p className="text-[9px] text-amber-600 font-bold mt-1">{warnings.phRO}</p>}
                   </div>
                   <div>
-                    <label className="block text-[11px] text-slate-500 mb-1 font-bold">EC Drenaje (mS/cm)</label>
+                    <label className="block text-[11px] text-slate-500 mb-1 font-bold">EC Drenaje <span className="text-slate-400 font-normal">(mS/cm o μS)</span></label>
                     <input
-                      type="number"
-                      step="0.01"
-                      onChange={(e) => setEcRunoff(e.target.value)}
+                      type="text"
+                      inputMode="decimal"
+                      value={ecRunoff}
+                      onChange={(e) => setEcRunoff(e.target.value.replace(/[^0-9.]/g, ''))}
                       onBlur={() => handleECBlur(ecRunoff, setEcRunoff)}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
-                      placeholder="Ej: 1.8"
+                      placeholder="Ej: 1.8 o 1800"
                     />
+                    {ecRunoff && parseFloat(ecRunoff) >= 10 && <p className="text-[9px] text-emerald-600 font-bold mt-1">→ Se guardará como {(parseFloat(ecRunoff) / 1000).toFixed(2)} mS/cm</p>}
                     {warnings.ecRO && <p className="text-[9px] text-red-600 font-extrabold mt-1">{warnings.ecRO}</p>}
                   </div>
                 </div>
@@ -434,7 +450,7 @@ export const LogsView = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-655 mb-1">Agua (L / opcional)</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Agua (L / opcional)</label>
                   <input
                     type="number"
                     step="0.1"
@@ -445,7 +461,7 @@ export const LogsView = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-655 mb-1">Quién Regó *</label>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Quién Regó *</label>
                   <select
                     value={wateredBy}
                     onChange={(e) => setWateredBy(e.target.value)}
@@ -462,7 +478,7 @@ export const LogsView = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-655 mb-1">Notas / Observaciones</label>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Notas / Observaciones</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -488,7 +504,7 @@ export const LogsView = () => {
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden h-full flex flex-col shadow-sm">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Calendar size={20} className="text-emerald-650" />
+                <Calendar size={20} className="text-emerald-600" />
                 Historial de Registros
               </h3>
               <div className="flex items-center gap-2">
@@ -497,7 +513,7 @@ export const LogsView = () => {
                   id="onlyWaterings"
                   checked={onlyWaterings}
                   onChange={(e) => setOnlyWaterings(e.target.checked)}
-                  className="rounded border-slate-350 bg-white text-emerald-600 focus:ring-emerald-500/50"
+                  className="rounded border-slate-300 bg-white text-emerald-600 focus:ring-emerald-500/50"
                 />
                 <label htmlFor="onlyWaterings" className="text-xs text-slate-500 cursor-pointer select-none font-bold">
                   Ver solo riegos
@@ -550,7 +566,7 @@ export const LogsView = () => {
                           <td className="p-4 text-xs text-slate-500 leading-normal">
                             {log.water_amount || log.ph || log.ec ? (
                               <div>
-                                {log.water_amount && <span className="block text-slate-855 font-bold">{log.water_amount} L agua</span>}
+                                {log.water_amount && <span className="block text-slate-800 font-bold">{log.water_amount} L agua</span>}
                                 {(log.ph || log.ec) && (
                                   <span>pH: {log.ph || '-.-'} • EC: {log.ec || '-.-'}</span>
                                 )}
@@ -579,10 +595,10 @@ export const LogsView = () => {
                                 <ImageIcon size={18} />
                               </button>
                             ) : (
-                              <span className="text-slate-305">-</span>
+                              <span className="text-slate-300">-</span>
                             )}
                           </td>
-                          <td className="p-4 text-slate-655 font-semibold truncate max-w-[100px]">{log.watered_by || 'José'}</td>
+                          <td className="p-4 text-slate-600 font-semibold truncate max-w-[100px]">{log.watered_by || 'José'}</td>
                           <td className="p-4 text-center">
                             <button
                               onClick={() => deleteLog(log.id)}
@@ -638,11 +654,11 @@ export const LogsView = () => {
                       <div className="grid grid-cols-3 gap-2 py-2 border-t border-b border-slate-200/50 text-center text-xs font-semibold">
                         <div>
                           <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Temp</span>
-                          <span className="font-black text-slate-805">{log.temp.toFixed(1)}°C</span>
+                          <span className="font-black text-slate-800">{log.temp.toFixed(1)}°C</span>
                         </div>
                         <div>
                           <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Hum</span>
-                          <span className="font-black text-slate-805">{log.humidity}%</span>
+                          <span className="font-black text-slate-800">{log.humidity}%</span>
                         </div>
                         <div>
                           <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">VPD</span>
@@ -699,7 +715,7 @@ export const LogsView = () => {
                         )}
                         <button
                           onClick={() => deleteLog(log.id)}
-                          className="text-xs text-red-500 hover:text-red-650 font-bold flex items-center gap-1"
+                          className="text-xs text-red-600 hover:text-red-600 font-bold flex items-center gap-1"
                         >
                           <Trash2 size={13} />
                           Eliminar

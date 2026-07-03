@@ -3,7 +3,7 @@ import { useGrow } from '../context/GrowContext';
 import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database, Users } from 'lucide-react';
 
 export const SettingsView = () => {
-  const { strains, lots, logs, tasks, helpers, addStrain, deleteStrain, addHelper, deleteHelper, clearDatabase, loadDemoData } = useGrow();
+  const { strains, lots, logs, tasks, helpers, addStrain, deleteStrain, addHelper, deleteHelper, clearDatabase, loadDemoData, importDatabase } = useGrow();
 
   // Formulario de genética
   const [strainName, setStrainName] = useState('');
@@ -43,17 +43,20 @@ export const SettingsView = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const imported = JSON.parse(event.target?.result as string);
         if (imported.strains && imported.lots && imported.logs && imported.tasks) {
-          localStorage.setItem('growmanager_react_state', JSON.stringify(imported));
-          window.location.reload();
+          if (confirm('¿Estás seguro de que deseas importar este respaldo? Se sobrescribirá la base de datos actual.')) {
+            await importDatabase(imported);
+            alert('Importación completada con éxito.');
+          }
         } else {
           alert('El archivo no posee el formato de respaldo correcto.');
         }
-      } catch {
-        alert('Error al parsear el archivo JSON.');
+      } catch (err) {
+        alert('Error al importar el archivo JSON.');
+        console.error(err);
       }
     };
     reader.readAsText(file);
@@ -209,7 +212,7 @@ export const SettingsView = () => {
           </div>
 
           {/* Zona de Peligro */}
-          <div className="mt-8 p-4 bg-red-50 border border-red-150 rounded-xl space-y-4">
+          <div className="mt-8 p-4 bg-red-50 border border-red-200 rounded-xl space-y-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <AlertTriangle size={16} className="text-red-600" />
@@ -226,7 +229,7 @@ export const SettingsView = () => {
                     clearDatabase();
                   }
                 }}
-                className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-red-55 hover:bg-red-100/70 text-red-600 font-bold rounded-xl border border-red-200 transition duration-150"
+                className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-red-50 hover:bg-red-100/70 text-red-600 font-bold rounded-xl border border-red-200 transition duration-150"
               >
                 <Trash2 size={16} />
                 Vaciar Base de Datos (Comenzar Limpio)

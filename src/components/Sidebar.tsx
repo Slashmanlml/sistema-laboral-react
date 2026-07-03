@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Box, Thermometer, CalendarCheck, Settings, Sprout, X, LogOut } from 'lucide-react';
+import { LayoutDashboard, Box, Thermometer, CalendarCheck, Settings, Sprout, X, LogOut, BarChart3 } from 'lucide-react';
 import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed } from '../utils/calculations';
 import { supabase } from '../lib/supabaseClient';
@@ -15,7 +15,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const location = useLocation();
 
   const activeLots = lots.filter(l => !l.is_archived);
-  const latestLot = activeLots[activeLots.length - 1];
+  const latestLot = [...activeLots].sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
 
   return (
     <>
@@ -55,6 +55,7 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           <NavItem to="/lots" active={location.pathname === '/lots'} icon={<Box size={20}/>} label="Lotes de Cultivo" onClick={onClose} />
           <NavItem to="/logs" active={location.pathname === '/logs'} icon={<Thermometer size={20}/>} label="Registro Diario" onClick={onClose} />
           <NavItem to="/tasks" active={location.pathname === '/tasks'} icon={<CalendarCheck size={20}/>} label="Tareas y Agenda" onClick={onClose} />
+          <NavItem to="/reports" active={location.pathname === '/reports'} icon={<BarChart3 size={20}/>} label="Reportes" onClick={onClose} />
           <NavItem to="/settings" active={location.pathname === '/settings'} icon={<Settings size={20}/>} label="Ajustes" onClick={onClose} />
         </nav>
 

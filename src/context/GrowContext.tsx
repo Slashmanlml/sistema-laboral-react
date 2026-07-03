@@ -98,6 +98,7 @@ interface GrowContextType {
   uploadPhoto: (file: File) => Promise<string | null>;
   clearDatabase: () => Promise<void>;
   loadDemoData: () => Promise<void>;
+  importDatabase: (data: any) => Promise<void>;
 }
 
 const GrowContext = createContext<GrowContextType | undefined>(undefined);
@@ -466,12 +467,50 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const importDatabase = async (data: any) => {
+    try {
+      setLoading(true);
+      await clearDatabase();
+      if (data.strains && data.strains.length > 0) {
+        const { error } = await supabase.from('strains').insert(data.strains);
+        if (error) throw error;
+        setStrains(data.strains);
+      }
+      if (data.lots && data.lots.length > 0) {
+        const { error } = await supabase.from('lots').insert(data.lots);
+        if (error) throw error;
+        setLots(data.lots);
+      }
+      if (data.logs && data.logs.length > 0) {
+        const { error } = await supabase.from('logs').insert(data.logs);
+        if (error) throw error;
+        setLogs(data.logs);
+      }
+      if (data.tasks && data.tasks.length > 0) {
+        const { error } = await supabase.from('tasks').insert(data.tasks);
+        if (error) throw error;
+        setTasks(data.tasks);
+      }
+      if (data.helpers && data.helpers.length > 0) {
+        const { error } = await supabase.from('helpers').insert(data.helpers);
+        if (error) throw error;
+        setHelpers(data.helpers);
+      }
+    } catch (err) {
+      console.error("Error al importar base de datos:", err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <GrowContext.Provider value={{
       strains, lots, logs, tasks, helpers,
       addLot, editLot, archiveLot, unarchiveLot,
       addLog, deleteLog, addTask, toggleTask, deleteTask,
-      addStrain, deleteStrain, addHelper, deleteHelper, uploadPhoto, clearDatabase, loadDemoData
+      addStrain, deleteStrain, addHelper, deleteHelper, uploadPhoto, clearDatabase, loadDemoData,
+      importDatabase
     }}>
       {loading ? (
         <div className="flex min-h-screen bg-slate-50 text-slate-800 items-center justify-center font-sans">

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed, getVPDInfo } from '../utils/calculations';
 import { Thermometer, Droplets, Wind, Sprout, Plus, Calendar, CheckCircle2, Dna, Image as ImageIcon } from 'lucide-react';
+import { getLunarInfo, LUNAR_DAY_META, LUNAR_PHASE_META } from '../utils/lunar';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -137,13 +138,55 @@ export const DashboardView = () => {
           </div>
           <button
             onClick={() => setShowQuickLog(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150 shadow-sm shadow-emerald-750/10 text-sm"
+            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150 shadow-sm shadow-emerald-600/10 text-sm"
           >
             <Plus size={18} />
             Nuevo Registro
           </button>
         </div>
       </div>
+
+      {/* Widget Growlendario Lunar */}
+      {(() => {
+        const lunarInfo = getLunarInfo(new Date());
+        const meta = LUNAR_DAY_META[lunarInfo.type];
+        const phase = LUNAR_PHASE_META[lunarInfo.phase];
+        return (
+          <div className="p-5 border rounded-2xl shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition animate-in fade-in duration-200"
+            style={{ backgroundColor: meta.bgColor, borderColor: meta.borderColor }}
+          >
+            <div className="flex items-start gap-4">
+              <span className="text-4xl leading-none mt-1 select-none shrink-0">{meta.emoji}</span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border border-white/50" style={{ backgroundColor: `${meta.color}15`, color: meta.textColor }}>
+                    {meta.label}
+                  </span>
+                  <span className="text-xs text-slate-500 font-bold flex items-center gap-1">
+                    Fase: <strong className="text-slate-800 flex items-center gap-0.5">{phase.emoji} {phase.label}</strong>
+                  </span>
+                </div>
+                <h3 className="text-base font-extrabold text-slate-900 mt-1.5">Recomendación Lunar de Hoy</h3>
+                {lunarInfo.warning ? (
+                  <p className="text-xs font-bold text-red-600 mt-1">⚠️ {lunarInfo.warning}</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {lunarInfo.activities.map((act, idx) => (
+                      <span key={idx} className="text-xs font-bold bg-white/80 border border-slate-100 text-slate-700 px-2.5 py-1 rounded-xl shadow-xs flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
+                        {act}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="text-xs text-slate-600 leading-normal max-w-xs font-semibold bg-white/60 p-3 rounded-xl border border-white/50 self-stretch md:self-auto flex items-center shadow-2xs">
+              <span>💡 <strong>Efecto lunar:</strong> La gravedad y la luz de la luna regulan la presión de la savia. Durante el {meta.label.toLowerCase()} ({phase.label.toLowerCase()}), las plantas responden de forma óptima a estas labores.</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Grid de Métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -435,14 +478,15 @@ export const DashboardView = () => {
                 <div>
                   <label className="block text-sm font-semibold text-slate-600 mb-1">EC Riego <span className="text-slate-400 font-normal">(mS/cm o μS)</span></label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={ec}
-                    onChange={(e) => setEc(e.target.value)}
+                    onChange={(e) => setEc(e.target.value.replace(/[^0-9.]/g, ''))}
                     onBlur={() => { const n = parseFloat(ec); if (!isNaN(n) && n >= 10) setEc((n/1000).toFixed(2)); }}
                     className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
                     placeholder="Ej: 1.2 o 1200"
                   />
+                  {ec && parseFloat(ec) >= 10 && <p className="text-[10px] text-emerald-600 font-bold mt-1">→ Se guardará como {(parseFloat(ec) / 1000).toFixed(2)} mS/cm</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-600 mb-1">Agua (L)</label>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGrow } from '../context/GrowContext';
 import { Trash2, Plus, Calendar, CheckCircle2, Sprout, Filter, ChevronLeft, ChevronRight, List, Beaker, Moon } from 'lucide-react';
 import type { Task } from '../types/grow';
-import { GROWLENDARIO, LUNAR_DAY_META, LUNAR_PHASE_META } from '../data/growlendario';
+import { getLunarInfo, LUNAR_DAY_META, LUNAR_PHASE_META } from '../utils/lunar';
 
 export const TasksView = () => {
   const { tasks, lots, addTask, toggleTask, deleteTask } = useGrow();
@@ -89,7 +89,7 @@ export const TasksView = () => {
 
   // Tareas del día seleccionado
   const selectedDateTasks = tasks.filter(t => t.date === selectedDate);
-  const selectedLunarDay = selectedDate ? GROWLENDARIO[selectedDate] : null;
+  const selectedLunarDay = selectedDate ? getLunarInfo(new Date(selectedDate + 'T12:00:00')) : null;
 
   const monthName = currentDate.toLocaleString('es-AR', { month: 'long', year: 'numeric' });
 
@@ -321,7 +321,7 @@ export const TasksView = () => {
                       const dayTasks = tasks.filter(t => t.date === dateStr);
                       const isToday = new Date().toISOString().split('T')[0] === dateStr;
                       const isSelected = selectedDate === dateStr;
-                      const lunar = GROWLENDARIO[dateStr];
+                      const lunar = getLunarInfo(day);
                       const lunarMeta = lunar ? LUNAR_DAY_META[lunar.type] : null;
                       const phaseMeta = lunar ? LUNAR_PHASE_META[lunar.phase] : null;
 
@@ -329,26 +329,30 @@ export const TasksView = () => {
                         <div
                           key={dateStr}
                           onClick={() => setSelectedDate(dateStr)}
-                          className={`border rounded-xl p-2 min-h-[90px] flex flex-col cursor-pointer transition duration-150 ${
+                          className={`border rounded-xl p-2 min-h-[95px] flex flex-col justify-between cursor-pointer transition duration-150 ${
                             isSelected
-                              ? 'border-emerald-500 ring-1 ring-emerald-500/20 shadow-sm shadow-emerald-500/10'
+                              ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm shadow-emerald-500/10'
                               : isToday
-                                ? 'border-slate-300 bg-slate-50'
-                                : 'border-slate-200 hover:border-slate-300'
+                                ? 'border-slate-400 bg-slate-100/70 font-extrabold'
+                                : 'border-slate-200 hover:border-slate-350 hover:shadow-xs'
                           }`}
-                          style={isSelected
-                            ? { background: lunarMeta ? lunarMeta.bgColor : '#f0fdf4' }
-                            : { background: lunar?.type === 'nodo' ? '#f8fafc' : lunarMeta ? lunarMeta.bgColor + '55' : 'white' }
+                          style={
+                            lunarMeta
+                              ? {
+                                  backgroundColor: isSelected ? lunarMeta.bgColor : `${lunarMeta.bgColor}dd`,
+                                  borderColor: isSelected ? lunarMeta.color : lunarMeta.borderColor,
+                                }
+                              : undefined
                           }
                         >
                           {/* Número del día + fase lunar */}
                           <div className="flex justify-between items-start">
-                            <span className={`text-xs font-bold ${
-                              isSelected ? 'text-emerald-600' : isToday ? 'text-slate-900 font-extrabold' : 'text-slate-500'
+                            <span className={`text-xs font-extrabold ${
+                              isSelected ? 'text-slate-900' : isToday ? 'text-slate-900 font-extrabold' : 'text-slate-500'
                             }`}>
                               {day.getDate()}
                             </span>
-                            <div className="flex items-center gap-0.5">
+                            <div className="flex items-center gap-0.5 bg-white/70 px-1 py-0.5 rounded shadow-xs border border-slate-100">
                               {phaseMeta && (
                                 <span className="text-[10px]" title={phaseMeta.label}>{phaseMeta.emoji}</span>
                               )}
@@ -358,24 +362,33 @@ export const TasksView = () => {
                             </div>
                           </div>
 
+                          {/* Tipo de día visible directamente */}
+                          {lunarMeta && (
+                            <div className="mt-1 text-left">
+                              <span className="text-[8px] font-extrabold uppercase px-1 py-0.5 rounded border border-white/50" style={{ backgroundColor: `${lunarMeta.color}15`, color: lunarMeta.textColor }}>
+                                {lunarMeta.emoji} {lunarMeta.label.split(' ')[1]}
+                              </span>
+                            </div>
+                          )}
+
                           {/* Aviso nodo */}
                           {lunar?.type === 'nodo' && (
-                            <span className="text-[8px] font-extrabold text-slate-400 mt-0.5 leading-none">⚠ No labores</span>
+                            <span className="text-[8px] font-extrabold text-slate-500 mt-1 uppercase tracking-wider">⚠ No tocar</span>
                           )}
 
                           {/* Tareas en miniatura */}
-                          <div className="space-y-0.5 mt-auto pt-1 overflow-y-auto max-h-[40px]">
+                          <div className="space-y-0.5 mt-2 overflow-y-auto max-h-[38px] pr-0.5">
                             {dayTasks.slice(0, 2).map(task => (
                               <div
                                 key={task.id}
-                                className={`text-[8px] truncate px-1 py-0.5 rounded font-bold border leading-none ${taskTypeBadge(task.type)}`}
+                                className={`text-[8px] truncate px-1 py-0.5 rounded font-extrabold border leading-none ${taskTypeBadge(task.type)}`}
                                 title={task.title}
                               >
                                 {task.title}
                               </div>
                             ))}
                             {dayTasks.length > 2 && (
-                              <div className="text-[8px] text-slate-400 text-center font-bold">+{dayTasks.length - 2}</div>
+                              <div className="text-[7px] text-slate-500 text-center font-bold">+{dayTasks.length - 2} tareas</div>
                             )}
                           </div>
                         </div>
@@ -534,7 +547,7 @@ export const TasksView = () => {
                       month: 'short'
                     });
                     const isWateringTask = task.type === 'riego' || task.type === 'fertilizante';
-                    const lunar = GROWLENDARIO[task.date];
+                    const lunar = getLunarInfo(new Date(task.date + 'T12:00:00'));
                     const lunarMeta = lunar ? LUNAR_DAY_META[lunar.type] : null;
 
                     return (
