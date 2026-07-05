@@ -26,7 +26,13 @@ export const sendMessageToAgent = async (
 ): Promise<AgentResponse> => {
   const provider = localStorage.getItem('grow_ai_provider') || 'gemini';
   const apiKey = localStorage.getItem('grow_ai_api_key') || '';
-  const customModel = localStorage.getItem('grow_ai_model') || '';
+  let customModel = localStorage.getItem('grow_ai_model') || '';
+
+  // Auto-migrar modelos obsoletos en 2026
+  if (customModel === 'gemini-1.5-flash') {
+    customModel = 'gemini-2.5-flash';
+    localStorage.setItem('grow_ai_model', 'gemini-2.5-flash');
+  }
 
   if (!apiKey) {
     return {
@@ -94,7 +100,7 @@ REGLAS DE IDENTIFICADORES (IDs):
     let textResponse = '';
 
     if (provider === 'gemini') {
-      const modelName = customModel || 'gemini-1.5-flash';
+      const modelName = customModel || 'gemini-2.5-flash';
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
       // Dar formato a historial de mensajes para Gemini API

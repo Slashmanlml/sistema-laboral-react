@@ -340,7 +340,7 @@ export const AiChatWidget = () => {
                       type="text"
                       value={modelName}
                       onChange={(e) => setModelName(e.target.value)}
-                      placeholder={provider === 'gemini' ? 'gemini-1.5-flash' : 'gpt-4o-mini'}
+                      placeholder={provider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini'}
                       className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 font-mono"
                     />
                     <span className="text-[9px] text-slate-400 font-medium block mt-1">
