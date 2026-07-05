@@ -35,9 +35,12 @@ create table logs (
   vpd numeric not null,
   ph numeric,
   ec numeric,
+  ph_runoff numeric,
+  ec_runoff numeric,
   water_amount numeric,
   watered_by text,
-  notes text
+  notes text,
+  image_url text
 );
 
 -- 4. Crear tabla de tareas (tasks)

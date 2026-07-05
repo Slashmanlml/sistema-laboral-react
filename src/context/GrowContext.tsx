@@ -110,6 +110,12 @@ interface GrowContextType {
   setActiveNutrientLine: (line: 'ryanodine' | 'athena_pro' | 'athena_blended') => Promise<void>;
   irrigationMethod: 'manual' | 'automated';
   setIrrigationMethod: (method: 'manual' | 'automated') => void;
+  appErrors: { id: string; timestamp: string; context: string; message: string; stack?: string }[];
+  clearAppErrors: () => void;
+  dbStatus: 'connected' | 'disconnected' | 'auth_error' | 'config_error' | 'loading';
+  dbLatency: number | null;
+  checkDbConnection: () => Promise<void>;
+  cleanOrphanedRecords: () => Promise<{ orphanedLogsCount: number; orphanedTasksCount: number }>;
 }
 
 const GrowContext = createContext<GrowContextType | undefined>(undefined);
@@ -122,6 +128,11 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [helpers, setHelpers] = useState<Helper[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Estados de Diagnóstico de Base de Datos y Consola de Errores
+  const [appErrors, setAppErrors] = useState<{ id: string; timestamp: string; context: string; message: string; stack?: string }[]>([]);
+  const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'auth_error' | 'config_error' | 'loading'>('loading');
+  const [dbLatency, setDbLatency] = useState<number | null>(null);
+
   // Estados de Configuración Athena
   const [activeNutrientLine, setActiveNutrientLineState] = useState<'ryanodine' | 'athena_pro' | 'athena_blended'>(
     (localStorage.getItem('activeNutrientLine') as any) || 'ryanodine'
@@ -129,6 +140,90 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [irrigationMethod, setIrrigationMethodState] = useState<'manual' | 'automated'>(
     (localStorage.getItem('irrigationMethod') as any) || 'manual'
   );
+
+  const logAppError = (context: string, error: any) => {
+    console.error(`[Error Context: ${context}]`, error);
+    const newError = {
+      id: 'err_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      context,
+      message: error instanceof Error ? error.message : (error && typeof error === 'object' ? JSON.stringify(error) : String(error)),
+      stack: error instanceof Error ? error.stack : undefined
+    };
+    setAppErrors(prev => [newError, ...prev].slice(0, 50));
+  };
+
+  const clearAppErrors = () => {
+    setAppErrors([]);
+  };
+
+  const generateSafeId = (prefix: string): string => {
+    const randomPart = Math.random().toString(36).substring(2, 9);
+    const timePart = Date.now();
+    return `${prefix}_${randomPart}_${timePart}`;
+  };
+
+  const checkDbConnection = async () => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      setDbStatus('config_error');
+      return;
+    }
+    try {
+      const startTime = Date.now();
+      const { error } = await supabase.from('strains').select('id').limit(1);
+      if (error) {
+        if (error.code === 'PGRST111' || error.message?.includes('JWT') || error.message?.includes('auth')) {
+          setDbStatus('auth_error');
+        } else {
+          setDbStatus('disconnected');
+        }
+        logAppError('Probar Conexión Supabase', error);
+      } else {
+        setDbLatency(Date.now() - startTime);
+        setDbStatus('connected');
+      }
+    } catch (err) {
+      setDbStatus('disconnected');
+      logAppError('Probar Conexión Supabase', err);
+    }
+  };
+
+  const cleanOrphanedRecords = async () => {
+    try {
+      const lotIds = new Set(lots.map(l => l.id));
+      const orphanedLogs = logs.filter(log => !lotIds.has(log.lot_id));
+      const orphanedTasks = tasks.filter(task => !lotIds.has(task.lot_id));
+
+      if (orphanedLogs.length > 0) {
+        const { error } = await supabase
+          .from('logs')
+          .delete()
+          .in('id', orphanedLogs.map(l => l.id));
+        if (error) throw error;
+        setLogs(prev => prev.filter(log => lotIds.has(log.lot_id)));
+      }
+
+      if (orphanedTasks.length > 0) {
+        const { error } = await supabase
+          .from('tasks')
+          .delete()
+          .in('id', orphanedTasks.map(t => t.id));
+        if (error) throw error;
+        setTasks(prev => prev.filter(task => lotIds.has(task.lot_id)));
+      }
+
+      return {
+        orphanedLogsCount: orphanedLogs.length,
+        orphanedTasksCount: orphanedTasks.length
+      };
+    } catch (err) {
+      logAppError('Limpiar Registros Huérfanos', err);
+      throw err;
+    }
+  };
 
   const loadSeedsToSupabase = async () => {
     const seeds = getSeeds();
@@ -143,7 +238,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLogs(seeds.initialLogs);
       setTasks(seeds.initialTasks);
     } catch (err) {
-      console.error("Error al cargar semillas en Supabase:", err);
+      logAppError("Cargar semillas en Supabase", err);
     }
   };
 
@@ -152,6 +247,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchData = async () => {
       try {
         setLoading(true);
+        await checkDbConnection();
         const [strainsRes, lotsRes, logsRes, tasksRes, helpersRes] = await Promise.all([
           supabase.from('strains').select('*'),
           supabase.from('lots').select('*'),
@@ -172,7 +268,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTasks(tasksRes.data || []);
         setHelpers(helpersRes.data || []);
       } catch (err) {
-        console.error("Error cargando datos de Supabase:", err);
+        logAppError("Cargando datos de Supabase", err);
       } finally {
         setLoading(false);
       }
@@ -302,7 +398,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addLot = async (lot: Omit<Lot, 'id' | 'is_archived'>) => {
     const newLot: Lot = {
       ...lot,
-      id: 'lot_' + Date.now(),
+      id: generateSafeId('lot'),
       is_archived: false
     };
     try {
@@ -319,7 +415,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Generar tareas semanales
       await generateScheduleTasks(newLot.id, newLot.stage, newLot.start_date);
     } catch (err) {
-      console.error("Error al agregar lote:", err);
+      logAppError("Agregar Lote", err);
     }
   };
 
@@ -338,7 +434,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Regenerar tareas si cambian fecha o fase
       await generateScheduleTasks(lot.id, lot.stage, lot.start_date);
     } catch (err) {
-      console.error("Error al editar lote:", err);
+      logAppError("Editar Lote", err);
     }
   };
 
@@ -348,7 +444,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setLots(prev => prev.map(l => l.id === id ? { ...l, is_archived: true } : l));
     } catch (err) {
-      console.error("Error al archivar lote:", err);
+      logAppError("Archivar Lote", err);
     }
   };
 
@@ -358,21 +454,21 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setLots(prev => prev.map(l => l.id === id ? { ...l, is_archived: false } : l));
     } catch (err) {
-      console.error("Error al reactivar lote:", err);
+      logAppError("Reactivar Lote", err);
     }
   };
 
   const addStrain = async (strain: Omit<Strain, 'id'>) => {
     const newStrain: Strain = {
       ...strain,
-      id: 'strain_' + Date.now()
+      id: generateSafeId('strain')
     };
     try {
       const { error } = await supabase.from('strains').insert(newStrain);
       if (error) throw error;
       setStrains(prev => [...prev, newStrain]);
     } catch (err) {
-      console.error("Error al agregar genética:", err);
+      logAppError("Agregar Genética", err);
     }
   };
 
@@ -382,7 +478,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setStrains(prev => prev.filter(s => s.id !== id));
     } catch (err) {
-      console.error("Error al borrar genética:", err);
+      logAppError("Borrar Genética", err);
     }
   };
 
@@ -390,7 +486,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const vpd = calculateVPD(log.temp, log.humidity);
     const newLog: Log = {
       ...log,
-      id: 'log_' + Date.now(),
+      id: generateSafeId('log'),
       date: new Date().toISOString(),
       vpd
     };
@@ -399,7 +495,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setLogs(prev => [newLog, ...prev]);
     } catch (err) {
-      console.error("Error al agregar registro:", err);
+      logAppError("Agregar Registro Diario", err);
     }
   };
 
@@ -409,14 +505,14 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setLogs(prev => prev.filter(l => l.id !== id));
     } catch (err) {
-      console.error("Error al borrar registro:", err);
+      logAppError("Borrar Registro Diario", err);
     }
   };
 
   const addTask = async (task: Omit<Task, 'id' | 'is_completed'>) => {
     const newTask: Task = {
       ...task,
-      id: 'task_' + Date.now(),
+      id: generateSafeId('task'),
       is_completed: false
     };
     try {
@@ -424,7 +520,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setTasks(prev => [...prev, newTask]);
     } catch (err) {
-      console.error("Error al agregar tarea:", err);
+      logAppError("Agregar Tarea", err);
     }
   };
 
@@ -437,7 +533,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setTasks(prev => prev.map(t => t.id === id ? updatedTask : t));
     } catch (err) {
-      console.error("Error al actualizar tarea:", err);
+      logAppError("Actualizar Estado de Tarea", err);
     }
   };
 
@@ -447,13 +543,13 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setTasks(prev => prev.filter(t => t.id !== id));
     } catch (err) {
-      console.error("Error al borrar tarea:", err);
+      logAppError("Borrar Tarea", err);
     }
   };
 
   const addHelper = async (name: string) => {
     const newHelper: Helper = {
-      id: 'helper_' + Date.now(),
+      id: generateSafeId('helper'),
       name
     };
     try {
@@ -461,7 +557,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setHelpers(prev => [...prev, newHelper]);
     } catch (err) {
-      console.error("Error al agregar ayudante:", err);
+      logAppError("Agregar Ayudante", err);
     }
   };
 
@@ -471,7 +567,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       setHelpers(prev => prev.filter(h => h.id !== id));
     } catch (err) {
-      console.error("Error al borrar ayudante:", err);
+      logAppError("Borrar Ayudante", err);
     }
   };
 
@@ -496,7 +592,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return publicUrl;
     } catch (err) {
-      console.error("Error al subir foto a Supabase Storage:", err);
+      logAppError("Subir Foto a Supabase Storage", err);
       return null;
     }
   };
@@ -516,7 +612,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setTasks([]);
       setHelpers([]);
     } catch (err) {
-      console.error("Error al vaciar la base de datos:", err);
+      logAppError("Vaciar Base de Datos", err);
     }
   };
 
@@ -525,7 +621,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       await loadSeedsToSupabase();
     } catch (err) {
-      console.error("Error al cargar demo:", err);
+      logAppError("Cargar Datos de Demostración", err);
     } finally {
       setLoading(false);
     }
@@ -535,33 +631,52 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setLoading(true);
       await clearDatabase();
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+
+      const sanitizeData = (list: any[]) => {
+        return list.map(item => {
+          const { user_id, ...rest } = item;
+          return {
+            ...rest,
+            ...(currentUserId ? { user_id: currentUserId } : {})
+          };
+        });
+      };
+
       if (data.strains && data.strains.length > 0) {
-        const { error } = await supabase.from('strains').insert(data.strains);
+        const sanitized = sanitizeData(data.strains);
+        const { error } = await supabase.from('strains').insert(sanitized);
         if (error) throw error;
-        setStrains(data.strains);
+        setStrains(sanitized);
       }
       if (data.lots && data.lots.length > 0) {
-        const { error } = await supabase.from('lots').insert(data.lots);
+        const sanitized = sanitizeData(data.lots);
+        const { error } = await supabase.from('lots').insert(sanitized);
         if (error) throw error;
-        setLots(data.lots);
+        setLots(sanitized);
       }
       if (data.logs && data.logs.length > 0) {
-        const { error } = await supabase.from('logs').insert(data.logs);
+        const sanitized = sanitizeData(data.logs);
+        const { error } = await supabase.from('logs').insert(sanitized);
         if (error) throw error;
-        setLogs(data.logs);
+        setLogs(sanitized);
       }
       if (data.tasks && data.tasks.length > 0) {
-        const { error } = await supabase.from('tasks').insert(data.tasks);
+        const sanitized = sanitizeData(data.tasks);
+        const { error } = await supabase.from('tasks').insert(sanitized);
         if (error) throw error;
-        setTasks(data.tasks);
+        setTasks(sanitized);
       }
       if (data.helpers && data.helpers.length > 0) {
-        const { error } = await supabase.from('helpers').insert(data.helpers);
+        const sanitized = sanitizeData(data.helpers);
+        const { error } = await supabase.from('helpers').insert(sanitized);
         if (error) throw error;
-        setHelpers(data.helpers);
+        setHelpers(sanitized);
       }
     } catch (err) {
-      console.error("Error al importar base de datos:", err);
+      logAppError("Importar Base de Datos", err);
       throw err;
     } finally {
       setLoading(false);
@@ -576,7 +691,9 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addStrain, deleteStrain, addHelper, deleteHelper, uploadPhoto, clearDatabase, loadDemoData,
       importDatabase,
       activeNutrientLine, setActiveNutrientLine,
-      irrigationMethod, setIrrigationMethod
+      irrigationMethod, setIrrigationMethod,
+      appErrors, clearAppErrors,
+      dbStatus, dbLatency, checkDbConnection, cleanOrphanedRecords
     }}>
       {loading ? (
         <div className="flex min-h-screen bg-slate-50 text-slate-800 items-center justify-center font-sans">

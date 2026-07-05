@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed, getVPDInfo, getAthenaClimateTargets } from '../utils/calculations';
-import { Thermometer, Droplets, Wind, Sprout, Plus, Calendar, CheckCircle2, Dna, Image as ImageIcon } from 'lucide-react';
+import { Thermometer, Droplets, Wind, Sprout, Plus, Calendar, CheckCircle2, Dna, Image as ImageIcon, Activity, Clock, AlertCircle } from 'lucide-react';
 import { getLunarInfo, LUNAR_DAY_META, LUNAR_PHASE_META } from '../utils/lunar';
+import { getWeeklyIrrigationSchedule, analyzeRunoffAndStrategy } from '../utils/irrigationEngine';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -30,7 +31,7 @@ ChartJS.register(
 export const DashboardView = () => {
   const { 
     lots, logs, tasks, toggleTask, addLog, 
-    activeNutrientLine
+    activeNutrientLine, irrigationMethod
   } = useGrow();
   const [showQuickLog, setShowQuickLog] = useState(false);
   const [activePhotoUrl, setActivePhotoUrl] = useState<string | null>(null);
@@ -194,6 +195,108 @@ export const DashboardView = () => {
             </div>
             <div className="text-xs text-slate-600 leading-normal max-w-xs font-semibold bg-white/60 p-3 rounded-xl border border-white/50 self-stretch md:self-auto flex items-center shadow-2xs">
               <span>💡 <strong>Efecto lunar:</strong> La gravedad y la luz de la luna regulan la presión de la savia. Durante el {meta.label.toLowerCase()} ({phase.label.toLowerCase()}), las plantas responden de forma óptima a estas labores.</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Widget de Alertas y Estrategia de Riego de Hoy */}
+      {(() => {
+        const waterableLots = activeLots.filter(l => l.stage === 'Vegetativo' || l.stage === 'Floración');
+        if (waterableLots.length === 0) return null;
+
+        return (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
+                <Activity size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Alertas de Riego y Escorrentía de Hoy</h3>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium">Cronograma de labores diario y sugerencias correctivas basadas en tus últimas mediciones de escorrentía.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {waterableLots.map(lot => {
+                const schedule = getWeeklyIrrigationSchedule(lot, new Date(), activeNutrientLine, irrigationMethod, logs);
+                const todaySched = schedule.find(d => d.date === todayStr);
+                const runoffAnalysis = analyzeRunoffAndStrategy(lot, logs, activeNutrientLine);
+
+                const isCompleted = todaySched ? todaySched.isCompleted : false;
+                const phTarget = todaySched ? todaySched.phTarget : 5.8;
+                const ecTarget = todaySched ? todaySched.ecTarget : 0.0;
+                const frequency = todaySched ? todaySched.frequency : 'Riego diario';
+                const timeOfDay = todaySched ? todaySched.timeOfDay : 'Mañana';
+                const dosisText = todaySched ? todaySched.dosisText : 'Agua base';
+
+                // Determinar clases de la tarjeta de runoff
+                let runoffBg = 'bg-slate-50 border-slate-100 text-slate-700';
+                if (runoffAnalysis.status === 'optimal') {
+                  runoffBg = 'bg-emerald-50/50 border-emerald-100 text-emerald-800';
+                } else if (runoffAnalysis.status === 'warning') {
+                  runoffBg = 'bg-amber-50/70 border-amber-200 text-amber-800';
+                } else if (runoffAnalysis.status === 'critical') {
+                  runoffBg = 'bg-rose-50/50 border-rose-100 text-rose-800';
+                }
+
+                return (
+                  <div key={lot.id} className="p-4 border border-slate-200 rounded-xl space-y-3.5 hover:border-slate-300 transition shadow-2xs flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <h4 className="font-extrabold text-slate-900 text-sm">{lot.name}</h4>
+                          <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">{lot.strain} • {lot.plant_count} plantas</span>
+                        </div>
+                        {isCompleted ? (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-emerald-100 text-emerald-700 border border-emerald-250 rounded">
+                            ✓ Regado
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-705 text-amber-700 border border-amber-200 rounded animate-pulse">
+                            ⚠️ Pendiente
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Parámetros de Hoy */}
+                      <div className="grid grid-cols-2 gap-2 text-xs font-semibold pt-1 border-t border-slate-100">
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <Droplets size={12} className="text-emerald-500" />
+                          <span>pH: <strong className="text-slate-800 font-extrabold">{phTarget.toFixed(1)}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-slate-500">
+                          <Wind size={12} className="text-emerald-500" />
+                          <span>EC: <strong className="text-slate-800 font-extrabold">{ecTarget.toFixed(2)} mS</strong></span>
+                        </div>
+                        <div className="col-span-2 flex items-center gap-1.5 text-slate-500">
+                          <Clock size={12} className="text-emerald-500 shrink-0" />
+                          <span className="truncate">{frequency} • {timeOfDay}</span>
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] text-slate-500 font-bold leading-snug bg-slate-50 p-2 rounded border border-slate-100">
+                        Fórmula: {dosisText}
+                      </p>
+                    </div>
+
+                    {/* Recomendación de Escorrentía */}
+                    <div className={`p-3 border rounded-lg text-[10.5px] font-semibold leading-relaxed mt-2 ${runoffBg}`}>
+                      {runoffAnalysis.status === 'insufficient_data' ? (
+                        <p className="text-slate-500 flex items-start gap-1">
+                          <AlertCircle size={12} className="mt-0.5 text-slate-400 shrink-0" />
+                          <span>Medir drenaje hoy para calibrar estrategia adaptativa.</span>
+                        </p>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="font-extrabold block text-slate-900">Estrategia de Runoff:</span>
+                          <p className="text-slate-750 font-medium whitespace-pre-line leading-normal">{runoffAnalysis.suggestedCorrection.replace('• ', '')}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );

@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed } from '../utils/calculations';
 import type { Lot } from '../types/grow';
-import { Search, Plus, Archive, ArchiveRestore, Edit3, Sprout, Hash, Calendar, Layers, FileText, Calculator, Beaker, TrendingUp, LayoutGrid, Kanban, ArrowRight } from 'lucide-react';
+import { Search, Plus, Archive, ArchiveRestore, Edit3, Sprout, Hash, Calendar, Layers, FileText, Calculator, Beaker, TrendingUp, LayoutGrid, Kanban, ArrowRight, CheckCircle, AlertCircle, Circle, Droplet, Clock, Info, AlertTriangle, Activity } from 'lucide-react';
 import { VEG_SCHEDULE, FLOWER_SCHEDULE } from '../utils/schedules';
+import { getWeeklyIrrigationSchedule, analyzeRunoffAndStrategy } from '../utils/irrigationEngine';
 
 export const LotsView = () => {
-  const { lots, strains, logs, addLot, editLot, archiveLot, unarchiveLot, addLog } = useGrow();
+  const { lots, strains, logs, addLot, editLot, archiveLot, unarchiveLot, addLog, activeNutrientLine, irrigationMethod } = useGrow();
 
   // Filtros y Vistas
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,6 +29,7 @@ export const LotsView = () => {
   // Modal de Cronograma
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedScheduleLot, setSelectedScheduleLot] = useState<Lot | null>(null);
+  const [modalTab, setModalTab] = useState<'sales' | 'irrigation'>('sales');
   
   // Semana seleccionada en el visualizador del cronograma
   const [activeScheduleWeek, setActiveScheduleWeek] = useState<number>(1);
@@ -114,6 +116,7 @@ export const LotsView = () => {
 
   const handleOpenScheduleModal = (lot: Lot) => {
     setSelectedScheduleLot(lot);
+    setModalTab('sales');
     
     // Auto-detectar la semana actual del cultivo
     const days = calculateDaysElapsed(lot.start_date);
@@ -697,161 +700,315 @@ export const LotsView = () => {
                 </button>
               </div>
 
+              {/* Selector de Pestañas */}
+              <div className="flex border-b border-slate-200 px-6 bg-white shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setModalTab('sales')}
+                  className={`py-3 px-4 text-xs font-bold border-b-2 transition cursor-pointer ${
+                    modalTab === 'sales'
+                      ? 'border-emerald-600 text-emerald-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Dosificación de Sales
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalTab('irrigation')}
+                  className={`py-3 px-4 text-xs font-bold border-b-2 transition cursor-pointer ${
+                    modalTab === 'irrigation'
+                      ? 'border-emerald-600 text-emerald-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Estrategia y Calendario de Riego
+                </button>
+              </div>
+
               {/* Body */}
               <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/30">
-                {/* 1. Selector de Semanas Stepper Horizontal */}
-                <div className="space-y-2">
-                  <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">Semanas del Cronograma Ryanodine</span>
-                  <div className="flex items-center justify-between gap-2 overflow-x-auto py-3 px-2 bg-white border border-slate-200 rounded-2xl shadow-sm scrollbar-thin">
-                    {schedule.map(s => {
-                      const isCurrent = s.week === currentWeekIndex;
-                      const isActive = s.week === activeScheduleWeek;
+                {modalTab === 'irrigation' ? (
+                  <div className="space-y-6">
+                    {/* 1. Diagnóstico de Runoff */}
+                    {(() => {
+                      const analysis = analyzeRunoffAndStrategy(selectedScheduleLot, logs, activeNutrientLine);
+                      
+                      let statusBg = 'bg-slate-50 border-slate-200 text-slate-700';
+                      let statusIcon = <Info className="text-slate-500" size={20} />;
+                      if (analysis.status === 'optimal') {
+                        statusBg = 'bg-emerald-50 border-emerald-100 text-emerald-850 text-emerald-800';
+                        statusIcon = <CheckCircle className="text-emerald-600" size={20} />;
+                      } else if (analysis.status === 'warning') {
+                        statusBg = 'bg-amber-50 border-amber-200 text-amber-850 text-amber-800';
+                        statusIcon = <AlertCircle className="text-amber-600" size={20} />;
+                      } else if (analysis.status === 'critical') {
+                        statusBg = 'bg-rose-50 border-rose-200 text-rose-850 text-rose-800';
+                        statusIcon = <AlertTriangle className="text-rose-600" size={20} />;
+                      }
 
                       return (
-                        <button
-                          key={s.week}
-                          onClick={() => setActiveScheduleWeek(s.week)}
-                          className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl transition duration-150 min-w-[70px] ${
-                            isActive
-                              ? 'bg-emerald-600 text-white font-bold shadow-sm'
-                              : isCurrent
-                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 font-bold'
-                                : 'bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200'
-                          }`}
-                        >
-                          <span className="text-[10px] uppercase font-extrabold tracking-wider">Sem</span>
-                          <span className="text-lg font-black leading-none">{s.week}</span>
-                          {isCurrent && (
-                            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-white' : 'bg-emerald-600'} animate-pulse`} />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. Grid de Información y Calculadora */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  {/* Panel de Dosificación */}
-                  <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[10px] bg-emerald-50 border border-emerald-100 text-emerald-600 font-bold px-2 py-0.5 rounded-full uppercase">
-                          Semana {activeScheduleWeek} Seleccionada
-                        </span>
-                        <h4 className="text-base font-extrabold text-slate-900 mt-2">{activeWeekData.title}</h4>
-                      </div>
-                      {activeScheduleWeek === currentWeekIndex && (
-                        <span className="text-[9px] uppercase font-black px-2.5 py-0.5 bg-emerald-600 text-white rounded-full animate-pulse shadow-sm">
-                          Semana en Curso
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Objetivos Climáticos y Nutrición */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
-                        <span className="text-[10px] text-slate-400 uppercase font-bold block">pH Objetivo</span>
-                        <span className="text-xl font-black text-slate-900 mt-1 block">{activeWeekData.ph.toFixed(1)}</span>
-                      </div>
-                      <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
-                        <span className="text-[10px] text-slate-400 uppercase font-bold block">EC Recomendada</span>
-                        <span className="text-xl font-black text-slate-900 mt-1 block">{activeWeekData.ec.toFixed(2)} mS/cm</span>
-                      </div>
-                    </div>
-
-                    {/* Calculadora Interactiva de Mezcla */}
-                    <div className="p-4 bg-emerald-500/5 border border-emerald-600/15 rounded-2xl space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          <Calculator size={14} className="text-emerald-600" />
-                          Calculadora de Dosis Ryanodine
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            value={tankLiters}
-                            onChange={(e) => setTankLiters(Math.max(1, parseInt(e.target.value) || 0))}
-                            className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-950 font-bold text-center text-xs shadow-sm focus:outline-none focus:border-emerald-500"
-                          />
-                          <span className="text-xs font-bold text-slate-600">Litros</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 pt-1 border-t border-emerald-600/10">
-                        <div className="flex justify-between text-xs font-bold">
-                          <span className="text-slate-600">Makro A (Base Crecimiento/Flora)</span>
-                          <span className="text-slate-900 font-extrabold text-sm">{calculatedA} ml</span>
-                        </div>
-                        <div className="flex justify-between text-xs font-bold">
-                          <span className="text-slate-600">Mikro B + Calcis C (Dosis Unificada B)</span>
-                          <span className="text-slate-900 font-extrabold text-sm">{calculatedB} ml</span>
-                        </div>
-                      </div>
-
-                      <p className="text-[10px] text-slate-500 leading-relaxed italic bg-white/60 p-2.5 rounded-lg border border-emerald-500/10">
-                        <strong>Nota de unificación:</strong> En la versión nueva de Ryanodine, Mikro B y Calcis C se unifican en la botella B. Usa la dosis indicada de B para tu preparación.
-                      </p>
-                    </div>
-
-                    <p className="text-xs text-slate-500 leading-relaxed font-semibold italic bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      {activeWeekData.notes}
-                    </p>
-                  </div>
-
-                  {/* Panel Lateral: Curva de EC de Cultivo */}
-                  <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5 mb-1.5">
-                        <TrendingUp size={16} className="text-emerald-600" />
-                        Curva de EC
-                      </h4>
-                      <p className="text-[10px] text-slate-400 font-semibold uppercase leading-snug">Progresión nutricional del ciclo</p>
-                    </div>
-
-                    <div className="flex items-end justify-between gap-1.5 h-36 pt-6 border-b border-slate-100 pb-2 px-1">
-                      {schedule.map(s => {
-                        const isThisWeek = s.week === activeScheduleWeek;
-                        const isCropCurrent = s.week === currentWeekIndex;
-                        const barHeight = Math.min((s.ec / 2.0) * 100, 100);
-
-                        return (
-                          <div key={s.week} className="flex-1 flex flex-col items-center gap-1">
-                            <span className={`text-[8px] font-bold ${isThisWeek ? 'text-emerald-600 font-extrabold' : 'text-slate-400'}`}>
-                              {s.ec.toFixed(1)}
+                        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                          <div className="flex items-center gap-2.5">
+                            <span className="p-2 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
+                              <Activity size={20} />
                             </span>
-                            <div className="w-full bg-slate-100 rounded-t h-24 flex items-end">
-                              <div 
-                                className={`w-full rounded-t transition-all duration-300 ${
-                                  isThisWeek 
-                                    ? 'bg-emerald-500 shadow shadow-emerald-500/30' 
-                                    : isCropCurrent
-                                      ? 'bg-emerald-400/60'
-                                      : 'bg-slate-300'
-                                }`}
-                                style={{ height: `${barHeight}%` }}
-                              />
-                            </div>
-                            <span className={`text-[8px] font-bold mt-1 ${isThisWeek ? 'text-emerald-600 font-black' : 'text-slate-400'}`}>
-                              S{s.week}
-                            </span>
+                            <h4 className="text-base font-bold text-slate-805 text-slate-800">Diagnóstico Adaptativo de Runoff</h4>
                           </div>
-                        );
-                      })}
-                    </div>
 
-                    <div className="text-[10px] text-slate-500 leading-relaxed font-medium pt-3 space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-emerald-500 rounded" />
-                        <span>Semana seleccionada para dosificación</span>
+                          <div className={`p-4 border rounded-xl flex items-start gap-3 text-xs font-semibold leading-relaxed ${statusBg}`}>
+                            <span className="mt-0.5 shrink-0">{statusIcon}</span>
+                            <div>
+                              <strong className="text-sm font-extrabold block mb-1">{analysis.message}</strong>
+                              <p className="whitespace-pre-line text-slate-650 font-medium">{analysis.suggestedCorrection}</p>
+                            </div>
+                          </div>
+
+                          {analysis.alerts.length > 0 && (
+                            <div className="space-y-1.5 pl-1">
+                              {analysis.alerts.map((al, idx) => (
+                                <span key={idx} className="block text-[11px] font-extrabold text-rose-600">
+                                  {al}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {analysis.status !== 'insufficient_data' && (
+                            <div className="pt-2">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-2 tracking-wider">Promedios (Últimos 3 Riegos)</span>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                                  <span className="text-[9px] text-slate-400 block font-bold">EC Entrada</span>
+                                  <span className="text-sm font-black text-slate-800 mt-0.5 block">{analysis.averages.avgInputEC || '-.-'} mS/cm</span>
+                                </div>
+                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                                  <span className="text-[9px] text-slate-400 block font-bold">EC Escorrentía</span>
+                                  <span className="text-sm font-black text-emerald-600 mt-0.5 block">{analysis.averages.avgRunoffEC || '-.-'} mS/cm</span>
+                                </div>
+                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                                  <span className="text-[9px] text-slate-400 block font-bold">pH Entrada</span>
+                                  <span className="text-sm font-black text-slate-800 mt-0.5 block">{analysis.averages.avgInputPH || '-.-'}</span>
+                                </div>
+                                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                                  <span className="text-[9px] text-slate-400 block font-bold">pH Escorrentía</span>
+                                  <span className="text-sm font-black text-emerald-600 mt-0.5 block">{analysis.averages.avgRunoffPH || '-.-'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* 2. Calendario de Riego Semanal */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                      <div className="flex items-center gap-2.5">
+                        <span className="p-2 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
+                          <Calendar size={20} />
+                        </span>
+                        <div>
+                          <h4 className="text-base font-bold text-slate-800">Calendario Semanal de Riego</h4>
+                          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Esquema sugerido Lunes a Domingo</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 bg-slate-300 rounded" />
-                        <span>Semana de ciclo general</span>
+
+                      <div className="space-y-3">
+                        {getWeeklyIrrigationSchedule(selectedScheduleLot, new Date(), activeNutrientLine, irrigationMethod, logs).map((day) => (
+                          <div key={day.date} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl gap-3">
+                            <div className="flex items-start gap-3">
+                              <span className="mt-0.5 text-slate-400 shrink-0">
+                                {day.isCompleted ? (
+                                  <CheckCircle className="text-emerald-500 fill-emerald-500/10" size={18} />
+                                ) : (
+                                  <Circle className="text-slate-300" size={18} />
+                                )}
+                              </span>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold text-slate-800">{day.dayName}</span>
+                                  <span className="text-[10px] text-slate-400 font-bold">{day.date}</span>
+                                  {day.isCompleted && (
+                                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 bg-emerald-50 border border-emerald-250 text-emerald-650 rounded">Regado</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 font-semibold">{day.dosisText}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3 sm:text-right sm:justify-end text-xs font-semibold text-slate-500">
+                              <span className="flex items-center gap-1.5 bg-white px-2 py-1 border border-slate-200 rounded-lg text-slate-600 shadow-2xs">
+                                <Droplet size={12} className="text-emerald-500" />
+                                pH: <strong className="text-slate-800 font-extrabold">{day.phTarget.toFixed(1)}</strong> • EC: <strong className="text-slate-800 font-extrabold">{day.ecTarget.toFixed(2)} mS</strong>
+                              </span>
+                              <span className="flex items-center gap-1.5 bg-white px-2 py-1 border border-slate-200 rounded-lg text-slate-600 shadow-2xs">
+                                <Clock size={12} className="text-emerald-500" />
+                                {day.frequency} • {day.timeOfDay}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* 1. Selector de Semanas Stepper Horizontal */}
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-bold text-slate-500 block uppercase tracking-wider">Semanas del Cronograma Ryanodine</span>
+                      <div className="flex items-center justify-between gap-2 overflow-x-auto py-3 px-2 bg-white border border-slate-200 rounded-2xl shadow-sm scrollbar-thin">
+                        {schedule.map(s => {
+                          const isCurrent = s.week === currentWeekIndex;
+                          const isActive = s.week === activeScheduleWeek;
+
+                          return (
+                            <button
+                              key={s.week}
+                              type="button"
+                              onClick={() => setActiveScheduleWeek(s.week)}
+                              className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl transition duration-150 min-w-[70px] cursor-pointer ${
+                                isActive
+                                  ? 'bg-emerald-600 text-white font-bold shadow-sm'
+                                  : isCurrent
+                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 font-bold'
+                                    : 'bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200'
+                              }`}
+                            >
+                              <span className="text-[10px] uppercase font-extrabold tracking-wider">Sem</span>
+                              <span className="text-lg font-black leading-none">{s.week}</span>
+                              {isCurrent && (
+                                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-white' : 'bg-emerald-600'} animate-pulse`} />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 2. Grid de Información y Calculadora */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      {/* Panel de Dosificación */}
+                      <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] bg-emerald-50 border border-emerald-100 text-emerald-600 font-bold px-2 py-0.5 rounded-full uppercase">
+                              Semana {activeScheduleWeek} Seleccionada
+                            </span>
+                            <h4 className="text-base font-extrabold text-slate-900 mt-2">{activeWeekData.title}</h4>
+                          </div>
+                          {activeScheduleWeek === currentWeekIndex && (
+                            <span className="text-[9px] uppercase font-black px-2.5 py-0.5 bg-emerald-600 text-white rounded-full animate-pulse shadow-sm">
+                              Semana en Curso
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Objetivos Climáticos y Nutrición */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">pH Objetivo</span>
+                            <span className="text-xl font-black text-slate-900 mt-1 block">{activeWeekData.ph.toFixed(1)}</span>
+                          </div>
+                          <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold block">EC Recomendada</span>
+                            <span className="text-xl font-black text-slate-900 mt-1 block">{activeWeekData.ec.toFixed(2)} mS/cm</span>
+                          </div>
+                        </div>
+
+                        {/* Calculadora Interactiva de Mezcla */}
+                        <div className="p-4 bg-emerald-500/5 border border-emerald-600/15 rounded-2xl space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                              <Calculator size={14} className="text-emerald-600" />
+                              Calculadora de Dosis Ryanodine
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                value={tankLiters}
+                                onChange={(e) => setTankLiters(Math.max(1, parseInt(e.target.value) || 0))}
+                                className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-950 font-bold text-center text-xs shadow-sm focus:outline-none focus:border-emerald-500"
+                              />
+                              <span className="text-xs font-bold text-slate-600">Litros</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2 pt-1 border-t border-emerald-600/10">
+                            <div className="flex justify-between text-xs font-bold">
+                              <span className="text-slate-600">Makro A (Base Crecimiento/Flora)</span>
+                              <span className="text-slate-900 font-extrabold text-sm">{calculatedA} ml</span>
+                            </div>
+                            <div className="flex justify-between text-xs font-bold">
+                              <span className="text-slate-600">Mikro B + Calcis C (Dosis Unificada B)</span>
+                              <span className="text-slate-900 font-extrabold text-sm">{calculatedB} ml</span>
+                            </div>
+                          </div>
+
+                          <p className="text-[10px] text-slate-500 leading-relaxed italic bg-white/60 p-2.5 rounded-lg border border-emerald-500/10">
+                            <strong>Nota de unificación:</strong> En la versión nueva de Ryanodine, Mikro B y Calcis C se unifican en la botella B. Usa la dosis indicada de B para tu preparación.
+                          </p>
+                        </div>
+
+                        <p className="text-xs text-slate-500 leading-relaxed font-semibold italic bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          {activeWeekData.notes}
+                        </p>
+                      </div>
+
+                      {/* Panel Lateral: Curva de EC de Cultivo */}
+                      <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+                        <div>
+                          <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5 mb-1.5">
+                            <TrendingUp size={16} className="text-emerald-600" />
+                            Curva de EC
+                          </h4>
+                          <p className="text-[10px] text-slate-400 font-semibold uppercase leading-snug">Progresión nutricional del ciclo</p>
+                        </div>
+
+                        <div className="flex items-end justify-between gap-1.5 h-36 pt-6 border-b border-slate-100 pb-2 px-1">
+                          {schedule.map(s => {
+                            const isThisWeek = s.week === activeScheduleWeek;
+                            const isCropCurrent = s.week === currentWeekIndex;
+                            const barHeight = Math.min((s.ec / 2.0) * 100, 100);
+
+                            return (
+                              <div key={s.week} className="flex-1 flex flex-col items-center gap-1">
+                                <span className={`text-[8px] font-bold ${isThisWeek ? 'text-emerald-600 font-extrabold' : 'text-slate-400'}`}>
+                                  {s.ec.toFixed(1)}
+                                </span>
+                                <div className="w-full bg-slate-100 rounded-t h-24 flex items-end">
+                                  <div 
+                                    className={`w-full rounded-t transition-all duration-300 ${
+                                      isThisWeek 
+                                        ? 'bg-emerald-500 shadow shadow-emerald-500/30' 
+                                        : isCropCurrent
+                                          ? 'bg-emerald-400/60'
+                                          : 'bg-slate-300'
+                                    }`}
+                                    style={{ height: `${barHeight}%` }}
+                                  />
+                                </div>
+                                <span className={`text-[8px] font-bold mt-1 ${isThisWeek ? 'text-emerald-600 font-black' : 'text-slate-400'}`}>
+                                  S{s.week}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="text-[10px] text-slate-500 leading-relaxed font-medium pt-3 space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 bg-emerald-500 rounded" />
+                            <span>Semana seleccionada para dosificación</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 bg-slate-300 rounded" />
+                            <span>Semana de ciclo general</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}

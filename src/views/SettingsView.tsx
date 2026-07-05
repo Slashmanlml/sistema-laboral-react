@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useGrow } from '../context/GrowContext';
-import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database, Users } from 'lucide-react';
+import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database, Users, Activity, RefreshCw, FileText } from 'lucide-react';
 
 export const SettingsView = () => {
   const { 
@@ -8,7 +8,9 @@ export const SettingsView = () => {
     addStrain, deleteStrain, addHelper, deleteHelper, 
     clearDatabase, loadDemoData, importDatabase,
     activeNutrientLine, setActiveNutrientLine,
-    irrigationMethod, setIrrigationMethod 
+    irrigationMethod, setIrrigationMethod,
+    appErrors, clearAppErrors,
+    dbStatus, dbLatency, checkDbConnection, cleanOrphanedRecords
   } = useGrow();
 
   // Formulario de genética
@@ -17,6 +19,10 @@ export const SettingsView = () => {
 
   // Formulario de ayudante
   const [helperName, setHelperName] = useState('');
+
+  // Estados de Depuración y Diagnóstico
+  const [checkingConn, setCheckingConn] = useState(false);
+  const [cleanStatus, setCleanStatus] = useState<string | null>(null);
 
   const handleAddStrain = (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,6 +300,187 @@ export const SettingsView = () => {
                 Cargar Datos de Demostración (Simulación)
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sección de Depuración y Diagnóstico */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700">
+              <Activity size={22} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-805 text-slate-800">Diagnóstico y Depuración del Sistema</h3>
+              <p className="text-xs text-slate-505 text-slate-500 mt-0.5 font-medium">Analiza el estado de la base de datos, conexión y registro de errores.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                setCheckingConn(true);
+                await checkDbConnection();
+                setCheckingConn(false);
+              }}
+              disabled={checkingConn}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-750 font-bold rounded-lg border border-slate-200 transition text-xs disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={checkingConn ? "animate-spin" : ""} />
+              Probar Conexión
+            </button>
+            <button
+              onClick={() => {
+                const reportLines = [
+                  `=== REPORTE DE DIAGNÓSTICO GROWMANAGER ===`,
+                  `Fecha: ${new Date().toISOString()}`,
+                  `Plataforma: ${navigator.userAgent}`,
+                  `Conectividad a Supabase: ${dbStatus}`,
+                  `Latencia Supabase: ${dbLatency !== null ? `${dbLatency}ms` : 'N/A'}`,
+                  ``,
+                  `=== PARÁMETROS DE CONFIGURACIÓN ===`,
+                  `Nutrientes Activos: ${activeNutrientLine}`,
+                  `Método de Riego: ${irrigationMethod}`,
+                  ``,
+                  `=== MÉTRICAS DE BASE DE DATOS LOCAL ===`,
+                  `Camas (Lots): ${lots.length}`,
+                  `Genéticas (Strains): ${strains.length}`,
+                  `Registros (Logs): ${logs.length}`,
+                  `Tareas (Tasks): ${tasks.length}`,
+                  `Ayudantes (Helpers): ${helpers.length}`,
+                  ``,
+                  `=== HISTORIAL DE ERRORES CAPTURADOS ===`,
+                  appErrors.length === 0 ? `Ninguno.` : appErrors.map((err, i) => (
+                    `[${i + 1}] Hora: ${err.timestamp}\n    Contexto: ${err.context}\n    Mensaje: ${err.message}\n${err.stack ? `    Stack:\n${err.stack.split('\n').map(l => '        ' + l).join('\n')}\n` : ''}`
+                  )).join('\n---\n')
+                ].join('\n');
+
+                const blob = new Blob([reportLines], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `growmanager_diagnostico_${new Date().toISOString().split('T')[0]}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg border border-emerald-100 transition text-xs"
+            >
+              <FileText size={13} />
+              Exportar Reporte
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Tarjeta de Estado de Conexión */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3.5">
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">Estado de Conexión</span>
+            <div className="flex items-center gap-2.5">
+              <div className={`w-3 h-3 rounded-full ${
+                dbStatus === 'connected' ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse' :
+                dbStatus === 'loading' ? 'bg-blue-500 animate-pulse' : 'bg-rose-500 animate-pulse'
+              }`} />
+              <span className="text-sm font-bold text-slate-800">
+                {dbStatus === 'connected' ? 'Conectado a Supabase' :
+                 dbStatus === 'disconnected' ? 'Desconectado de la Red' :
+                 dbStatus === 'auth_error' ? 'Error de Autenticación (Credenciales)' :
+                 dbStatus === 'config_error' ? 'Error de Configuración (Faltan variables .env)' :
+                 'Verificando conexión...'}
+              </span>
+            </div>
+            {dbStatus === 'connected' && dbLatency !== null && (
+              <p className="text-xs text-slate-500 font-semibold">
+                Latencia de respuesta: <strong className="text-slate-700">{dbLatency} ms</strong>
+              </p>
+            )}
+            <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+              La conexión se valida mediante consultas directas a las tablas en la nube de Supabase.
+            </p>
+          </div>
+
+          {/* Tarjeta de Resumen de Memoria */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3.5">
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">Registros en Memoria</span>
+            <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
+              <div>Camas: <strong className="text-slate-800 font-extrabold">{lots.length}</strong></div>
+              <div>Genéticas: <strong className="text-slate-800 font-extrabold">{strains.length}</strong></div>
+              <div>Registros: <strong className="text-slate-800 font-extrabold">{logs.length}</strong></div>
+              <div>Tareas: <strong className="text-slate-800 font-extrabold">{tasks.length}</strong></div>
+              <div className="col-span-2">Ayudantes: <strong className="text-slate-800 font-extrabold">{helpers.length}</strong></div>
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+              Métricas correspondientes a la información local sincronizada actualmente.
+            </p>
+          </div>
+
+          {/* Tarjeta de Herramientas de Integridad */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3.5">
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">Integridad de Datos</span>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await cleanOrphanedRecords();
+                  setCleanStatus(`Limpieza exitosa. Se borraron ${res.orphanedLogsCount} logs y ${res.orphanedTasksCount} tareas huérfanas.`);
+                  setTimeout(() => setCleanStatus(null), 5000);
+                } catch (err) {
+                  alert("Error al ejecutar limpieza.");
+                }
+              }}
+              className="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-350 transition text-xs shadow-xs cursor-pointer"
+            >
+              Corregir Huérfanos
+            </button>
+            {cleanStatus && (
+              <p className="text-[11px] text-emerald-600 font-bold text-center leading-normal">
+                {cleanStatus}
+              </p>
+            )}
+            <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+              Busca y remueve registros o tareas vinculados a lotes inexistentes (eliminados).
+            </p>
+          </div>
+        </div>
+
+        {/* Consola de Errores */}
+        <div className="mt-6 border border-slate-200 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+            <span className="text-xs font-bold text-slate-700">Historial de Errores de la Sesión ({appErrors.length})</span>
+            {appErrors.length > 0 && (
+              <button
+                onClick={clearAppErrors}
+                className="text-[10px] font-bold text-rose-600 hover:text-rose-700 border border-rose-200 px-2 py-0.5 rounded hover:bg-rose-50/50 transition cursor-pointer"
+              >
+                Limpiar Consola
+              </button>
+            )}
+          </div>
+          
+          <div className="p-4 bg-white max-h-64 overflow-y-auto font-mono text-xs text-slate-600">
+            {appErrors.length > 0 ? (
+              <div className="space-y-3">
+                {appErrors.map((err) => (
+                  <div key={err.id} className="p-3 bg-rose-50/30 border border-rose-100/70 rounded-lg space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 font-bold">{new Date(err.timestamp).toLocaleTimeString()}</span>
+                      <span className="text-[10px] uppercase font-extrabold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded">{err.context}</span>
+                    </div>
+                    <p className="text-slate-800 font-bold break-all leading-normal">{err.message}</p>
+                    {err.stack && (
+                      <details className="mt-1 cursor-pointer">
+                        <summary className="text-[9px] text-slate-400 select-none hover:text-slate-600 font-sans font-bold">Ver Stack Trace Técnico</summary>
+                        <pre className="mt-1.5 p-2 bg-slate-900 text-slate-300 rounded overflow-x-auto text-[10px] leading-relaxed break-all font-mono select-text whitespace-pre-wrap max-h-36">
+                          {err.stack}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-slate-400 font-semibold font-sans">
+                ✓ No se registraron errores en la sesión actual.
+              </div>
+            )}
           </div>
         </div>
       </div>
