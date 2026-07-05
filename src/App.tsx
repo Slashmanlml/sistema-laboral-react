@@ -35,6 +35,17 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (session?.user?.user_metadata) {
+      const { grow_ai_provider, grow_ai_api_key, grow_ai_model } = session.user.user_metadata;
+      if (grow_ai_provider) localStorage.setItem('grow_ai_provider', grow_ai_provider);
+      if (grow_ai_api_key) localStorage.setItem('grow_ai_api_key', grow_ai_api_key);
+      if (grow_ai_model !== undefined) localStorage.setItem('grow_ai_model', grow_ai_model || '');
+      // Disparar evento para actualizar componentes
+      window.dispatchEvent(new Event('storage'));
+    }
+  }, [session]);
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen bg-slate-50 text-slate-800 items-center justify-center font-sans select-none">

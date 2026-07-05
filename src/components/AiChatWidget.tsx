@@ -3,6 +3,7 @@ import { useGrow } from '../context/GrowContext';
 import { sendMessageToAgent } from '../utils/aiAgent';
 import type { MessageHistoryItem } from '../utils/aiAgent';
 import { Sparkles, X, Send, Bot, Key, Loader2, CheckCircle, Settings } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface ChatMessage {
   id: string;
@@ -63,13 +64,25 @@ export const AiChatWidget = () => {
     }
   }, [messages, isOpen, isLoading]);
 
-  const handleSaveConfig = (e: React.FormEvent) => {
+  const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKey.trim()) return;
 
     localStorage.setItem('grow_ai_api_key', apiKey.trim());
     localStorage.setItem('grow_ai_provider', provider);
     localStorage.setItem('grow_ai_model', modelName.trim());
+
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          grow_ai_provider: provider,
+          grow_ai_api_key: apiKey.trim(),
+          grow_ai_model: modelName.trim()
+        }
+      });
+    } catch (err) {
+      console.error("Error al sincronizar configuración con Supabase:", err);
+    }
 
     setIsConfigured(true);
     setShowConfig(false);
@@ -79,7 +92,7 @@ export const AiChatWidget = () => {
       {
         id: `sys-${Date.now()}`,
         sender: 'system',
-        text: '⚙️ Configuración guardada. ¡Ahora puedes chatear conmigo!',
+        text: '⚙️ Configuración guardada y sincronizada en la nube. ¡Ahora puedes chatear conmigo!',
         timestamp: new Date()
       }
     ]);

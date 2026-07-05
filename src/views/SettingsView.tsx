@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGrow } from '../context/GrowContext';
 import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database, Users, Activity, RefreshCw, FileText, Bot } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 export const SettingsView = () => {
   const { 
@@ -36,11 +37,23 @@ export const SettingsView = () => {
     setAiModel(localStorage.getItem('grow_ai_model') || '');
   }, []);
 
-  const handleSaveAiConfig = (e: React.FormEvent) => {
+  const handleSaveAiConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     localStorage.setItem('grow_ai_provider', aiProvider);
     localStorage.setItem('grow_ai_api_key', aiApiKey.trim());
     localStorage.setItem('grow_ai_model', aiModel.trim());
+    
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          grow_ai_provider: aiProvider,
+          grow_ai_api_key: aiApiKey.trim(),
+          grow_ai_model: aiModel.trim()
+        }
+      });
+    } catch (err) {
+      console.error("Error al sincronizar con Supabase:", err);
+    }
     
     setAiSavedStatus(true);
     setTimeout(() => setAiSavedStatus(false), 3000);
