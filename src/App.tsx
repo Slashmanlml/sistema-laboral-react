@@ -12,6 +12,7 @@ import { GrowProvider } from './context/GrowContext';
 import { Menu, Sprout } from 'lucide-react';
 import { supabase } from './lib/supabaseClient';
 import type { Session } from '@supabase/supabase-js';
+import { AiChatWidget } from './components/AiChatWidget';
 
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -83,6 +84,7 @@ function App() {
               </Routes>
             </main>
           </div>
+          <AiChatWidget />
         </div>
       </BrowserRouter>
     </GrowProvider>

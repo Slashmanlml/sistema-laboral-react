@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGrow } from '../context/GrowContext';
-import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database, Users, Activity, RefreshCw, FileText } from 'lucide-react';
+import { Dna, Plus, Trash2, Download, Upload, AlertTriangle, Database, Users, Activity, RefreshCw, FileText, Bot } from 'lucide-react';
 
 export const SettingsView = () => {
   const { 
@@ -23,6 +23,30 @@ export const SettingsView = () => {
   // Estados de Depuración y Diagnóstico
   const [checkingConn, setCheckingConn] = useState(false);
   const [cleanStatus, setCleanStatus] = useState<string | null>(null);
+
+  // Estados de Asistente IA
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'openai'>('gemini');
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [aiModel, setAiModel] = useState('');
+  const [aiSavedStatus, setAiSavedStatus] = useState(false);
+
+  useEffect(() => {
+    setAiProvider((localStorage.getItem('grow_ai_provider') as 'gemini' | 'openai') || 'gemini');
+    setAiApiKey(localStorage.getItem('grow_ai_api_key') || '');
+    setAiModel(localStorage.getItem('grow_ai_model') || '');
+  }, []);
+
+  const handleSaveAiConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('grow_ai_provider', aiProvider);
+    localStorage.setItem('grow_ai_api_key', aiApiKey.trim());
+    localStorage.setItem('grow_ai_model', aiModel.trim());
+    
+    setAiSavedStatus(true);
+    setTimeout(() => setAiSavedStatus(false), 3000);
+    // Notificar al widget si estuviera montado
+    window.dispatchEvent(new Event('storage'));
+  };
 
   const handleAddStrain = (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,6 +251,70 @@ export const SettingsView = () => {
                 </select>
               </div>
             </div>
+          </div>
+
+          {/* Configuración de Asistente IA */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600">
+                <Bot size={22} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">Asistente de IA (GrowIA)</h3>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-6 leading-relaxed font-medium">
+              Configura tus credenciales para habilitar el chat interactivo de diagnóstico de runoff, climatología y ejecución de tareas.
+            </p>
+
+            <form onSubmit={handleSaveAiConfig} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Proveedor de IA</label>
+                <select
+                  value={aiProvider}
+                  onChange={(e) => {
+                    const val = e.target.value as 'gemini' | 'openai';
+                    setAiProvider(val);
+                    setAiModel('');
+                  }}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm font-bold shadow-xs cursor-pointer"
+                >
+                  <option value="gemini">Google Gemini API (Modelos Flash)</option>
+                  <option value="openai">OpenAI API (ChatGPT)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">API Key</label>
+                <input
+                  type="password"
+                  value={aiApiKey}
+                  onChange={(e) => setAiApiKey(e.target.value)}
+                  placeholder={aiProvider === 'gemini' ? 'Ingresa tu clave de Gemini...' : 'sk-proj-...'}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-850 focus:outline-none focus:border-emerald-500 text-sm font-bold shadow-xs font-mono"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Modelo Personalizado (Opcional)</label>
+                <input
+                  type="text"
+                  value={aiModel}
+                  onChange={(e) => setAiModel(e.target.value)}
+                  placeholder={aiProvider === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini'}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-805 text-slate-800 focus:outline-none focus:border-emerald-500 text-sm font-bold shadow-xs font-mono"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150 shadow-sm cursor-pointer text-sm"
+                >
+                  {aiSavedStatus ? '✓ Configuración Guardada' : 'Guardar Configuración de IA'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
