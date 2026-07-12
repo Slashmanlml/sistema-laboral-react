@@ -25,6 +25,10 @@ export const SettingsView = () => {
   const [checkingConn, setCheckingConn] = useState(false);
   const [cleanStatus, setCleanStatus] = useState<string | null>(null);
 
+  // Estado del modal de confirmación de vaciado de base de datos
+  const [showClearDbModal, setShowClearDbModal] = useState(false);
+  const [clearConfirmText, setClearConfirmText] = useState('');
+
   // Estados de Asistente IA
   const [aiProvider, setAiProvider] = useState<'gemini' | 'openai'>('gemini');
   const [aiApiKey, setAiApiKey] = useState('');
@@ -77,7 +81,7 @@ export const SettingsView = () => {
   };
 
   const handleExport = () => {
-    const data = { strains, lots, logs, tasks, helpers };
+    const data = { exportedAt: new Date().toISOString(), appVersion: '1.0.0', strains, lots, logs, tasks, helpers };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -378,11 +382,7 @@ export const SettingsView = () => {
             </div>
             <div className="space-y-2">
               <button
-                onClick={() => {
-                  if (window.confirm('¿Estás seguro de querer vaciar el sistema? Se eliminarán todas las camas, registros diarios y tareas para que puedas cargar tus datos reales.')) {
-                    clearDatabase();
-                  }
-                }}
+                onClick={() => setShowClearDbModal(true)}
                 className="w-full flex items-center justify-center gap-2.5 px-5 py-2.5 bg-red-50 hover:bg-red-100/70 text-red-600 font-bold rounded-xl border border-red-200 transition duration-150"
               >
                 <Trash2 size={16} />
@@ -585,6 +585,49 @@ export const SettingsView = () => {
           </div>
         </div>
       </div>
+
+      {showClearDbModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-scale-in">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-red-100 rounded-xl">
+                <AlertTriangle size={22} className="text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Confirmar vaciado de base de datos</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-2">Esta acción es <strong>irreversible</strong>. Se eliminarán todos los lotes, registros, tareas y genéticas.</p>
+            <p className="text-sm text-slate-600 mb-4">Escribí <strong>CONFIRMAR</strong> para continuar:</p>
+            <input
+              type="text"
+              value={clearConfirmText}
+              onChange={(e) => setClearConfirmText(e.target.value)}
+              className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-red-400 mb-4 text-sm"
+              placeholder="Escribí CONFIRMAR"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowClearDbModal(false); setClearConfirmText(''); }}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (clearConfirmText === 'CONFIRMAR') {
+                    clearDatabase();
+                    setShowClearDbModal(false);
+                    setClearConfirmText('');
+                  }
+                }}
+                disabled={clearConfirmText !== 'CONFIRMAR'}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-bold rounded-xl transition"
+              >
+                Sí, vaciar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

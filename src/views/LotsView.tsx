@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed } from '../utils/calculations';
 import type { Lot } from '../types/grow';
-import { Search, Plus, Archive, ArchiveRestore, Edit3, Sprout, Hash, Calendar, Layers, FileText, Calculator, Beaker, TrendingUp, LayoutGrid, Kanban, ArrowRight, CheckCircle, AlertCircle, Circle, Droplet, Clock, Info, AlertTriangle, Activity } from 'lucide-react';
+import { Search, Plus, Archive, ArchiveRestore, Edit3, Sprout, Hash, Calendar, Layers, FileText, Calculator, Beaker, TrendingUp, LayoutGrid, Kanban, ArrowRight, CheckCircle, AlertCircle, Circle, Droplet, Clock, Info, AlertTriangle, Activity, Pencil } from 'lucide-react';
 import { VEG_SCHEDULE, FLOWER_SCHEDULE } from '../utils/schedules';
 import { getWeeklyIrrigationSchedule, analyzeRunoffAndStrategy } from '../utils/irrigationEngine';
 
@@ -121,7 +121,7 @@ export const LotsView = () => {
     // Auto-detectar la semana actual del cultivo
     const days = calculateDaysElapsed(lot.start_date);
     const currentWeek = Math.floor(days / 7);
-    const schedule = lot.stage === 'Floración' ? FLOWER_SCHEDULE : VEG_SCHEDULE;
+    const schedule = (lot.stage === 'Floración' || lot.stage === 'Secado' || lot.stage === 'Curado') ? FLOWER_SCHEDULE : VEG_SCHEDULE;
     
     const initialWeek = Math.max(
       schedule[0].week, 
@@ -296,28 +296,48 @@ export const LotsView = () => {
                             </div>
 
                             {/* Botonera de Acción rápida */}
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                              {isWaterable ? (
+                            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+                              <div className="grid grid-cols-2 gap-2">
+                                {isWaterable ? (
+                                  <button
+                                    onClick={() => handleOpenScheduleModal(lot)}
+                                    className="py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1"
+                                  >
+                                    <Calculator size={10} />
+                                    Sales
+                                  </button>
+                                ) : (
+                                  <div className="text-[9px] text-slate-400 italic flex items-center justify-center font-semibold">
+                                    Sin sales
+                                  </div>
+                                )}
                                 <button
-                                  onClick={() => handleOpenScheduleModal(lot)}
-                                  className="py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1"
+                                  onClick={() => handleOpenTransplantModal(lot)}
+                                  className="py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1"
+                                  title="Trasplantar / Cambiar Etapa"
                                 >
-                                  <Calculator size={10} />
-                                  Sales
+                                  <span>Trasplante</span>
+                                  <ArrowRight size={10} />
                                 </button>
-                              ) : (
-                                <div className="text-[9px] text-slate-400 italic flex items-center justify-center font-semibold">
-                                  Sin sales
-                                </div>
-                              )}
-                              <button
-                                onClick={() => handleOpenTransplantModal(lot)}
-                                className="py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1"
-                                title="Trasplantar / Cambiar Etapa"
-                              >
-                                <span>Trasplante</span>
-                                <ArrowRight size={10} />
-                              </button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={() => handleOpenEditModal(lot)}
+                                  className="py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1"
+                                  title="Editar lote"
+                                >
+                                  <Pencil size={10} />
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => archiveLot(lot.id)}
+                                  className="py-1.5 bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-600 border border-slate-200 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1"
+                                  title="Archivar lote"
+                                >
+                                  <Archive size={10} />
+                                  Archivar
+                                </button>
+                              </div>
                             </div>
                           </div>
                         );
@@ -339,7 +359,8 @@ export const LotsView = () => {
           {filteredLots.length > 0 ? (
             filteredLots.map(lot => {
               const days = calculateDaysElapsed(lot.start_date);
-              const progress = Math.min(Math.round((days / 90) * 100), 100);
+              const stageDuration = lot.stage === 'Germinación' ? 14 : lot.stage === 'Vegetativo' ? 60 : lot.stage === 'Floración' ? 70 : lot.stage === 'Secado' ? 14 : lot.stage === 'Curado' ? 30 : 90;
+              const progress = Math.min(Math.round((days / stageDuration) * 100), 100);
               const isWaterable = lot.stage === 'Vegetativo' || lot.stage === 'Floración';
 
               return (

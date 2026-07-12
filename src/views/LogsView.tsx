@@ -47,6 +47,11 @@ export const LogsView = () => {
   // Filtros
   const [onlyWaterings, setOnlyWaterings] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const LOGS_PER_PAGE = 20;
 
   const handleECBlur = (val: string, setter: (v: string) => void) => {
     const num = parseFloat(val);
@@ -204,6 +209,8 @@ export const LogsView = () => {
 
     } catch (err) {
       console.error("Error al guardar registro diario:", err);
+      setErrorMessage('Error al guardar el registro. Intenta de nuevo.');
+      setTimeout(() => setErrorMessage(null), 5000);
     } finally {
       setUploading(false);
     }
@@ -242,6 +249,12 @@ export const LogsView = () => {
         <div className="fixed bottom-6 right-6 bg-slate-900 border border-slate-800 text-emerald-400 font-extrabold text-sm py-3 px-5 rounded-2xl shadow-xl flex items-center gap-2.5 animate-in slide-in-from-bottom duration-200 z-50">
           <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
           {successMessage}
+        </div>
+      )}
+      {errorMessage && (
+        <div className="fixed bottom-6 right-6 bg-red-900 border border-red-800 text-red-200 font-extrabold text-sm py-3 px-5 rounded-2xl shadow-xl flex items-center gap-2.5 z-50" style={{marginBottom: successMessage ? '60px' : '0'}}>
+          <span className="w-2.5 h-2.5 bg-red-400 rounded-full" />
+          {errorMessage}
         </div>
       )}
       {/* Header */}
@@ -427,14 +440,14 @@ export const LogsView = () => {
                 </span>
                 
                 <div className="space-y-3">
-                  <label className="block text-[11px] text-slate-450 mb-1 font-semibold">Toma una foto de la cama o los lápices medidores</label>
+                  <label className="block text-[11px] text-slate-500 mb-1 font-semibold">Toma una foto de la cama o los lápices medidores</label>
                   <input
                     id="photo-upload-input"
                     type="file"
                     accept="image/*"
                     capture="environment" // Fuerza apertura de la cámara trasera en celulares
                     onChange={handleFileChange}
-                    className="w-full text-xs text-slate-550 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 transition cursor-pointer"
+                    className="w-full text-xs text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 transition cursor-pointer"
                   />
 
                   {/* Previsualización en Vivo de la foto tomada */}
@@ -486,7 +499,7 @@ export const LogsView = () => {
                   <select
                     value={wateredBy}
                     onChange={(e) => setWateredBy(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-850 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
+                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                     required
                   >
                     <option value="">Selecciona...</option>
@@ -547,7 +560,7 @@ export const LogsView = () => {
                 </div>
 
                 {/* 1. Indicaciones de Riego basadas en el método */}
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs font-semibold text-slate-650 leading-relaxed shadow-xs">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs font-semibold text-slate-700 leading-relaxed shadow-xs">
                   <span className="text-[10px] uppercase font-extrabold text-slate-500 block tracking-wider">Estrategia sugerida para {selectedLotObj.stage}</span>
                   {irrigationMethod === 'manual' ? (
                     <p>
@@ -606,7 +619,7 @@ export const LogsView = () => {
                           {desc}
                           {deltaEC !== null && (
                             <span className="block mt-1.5 font-bold text-[10px] uppercase">
-                              Delta EC (Drenaje - Entrada): <strong className={deltaEC > 1.0 ? 'text-amber-700' : 'text-slate-650'}>{deltaEC > 0 ? `+${deltaEC.toFixed(2)}` : deltaEC.toFixed(2)} mS/cm</strong>
+                              Delta EC (Drenaje - Entrada): <strong className={deltaEC > 1.0 ? 'text-amber-700' : 'text-slate-700'}>{deltaEC > 0 ? `+${deltaEC.toFixed(2)}` : deltaEC.toFixed(2)} mS/cm</strong>
                             </span>
                           )}
                         </div>
@@ -686,78 +699,81 @@ export const LogsView = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {filteredLogs.length > 0 ? (
-                    filteredLogs.map(log => {
-                      const lot = lots.find(l => l.id === log.lot_id);
-                      const lotName = lot ? lot.name : 'Lote Desconocido';
-                      const vpdInfo = getVPDInfo(log.vpd);
+                    (() => {
+                      const paginatedLogs = filteredLogs.slice((currentPage - 1) * LOGS_PER_PAGE, currentPage * LOGS_PER_PAGE);
+                      return paginatedLogs.map(log => {
+                        const lot = lots.find(l => l.id === log.lot_id);
+                        const lotName = lot ? lot.name : 'Lote Desconocido';
+                        const vpdInfo = getVPDInfo(log.vpd);
 
-                      const formattedDate = new Date(log.date).toLocaleString('es-AR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      });
+                        const formattedDate = new Date(log.date).toLocaleString('es-AR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
 
-                      return (
-                        <tr key={log.id} className="hover:bg-slate-50/50 transition">
-                          <td className="p-4 text-slate-600 font-semibold">{formattedDate}</td>
-                          <td className="p-4 text-emerald-600 font-bold truncate max-w-[120px]">{lotName}</td>
-                          <td className="p-4 text-slate-500">
-                            <span className="text-slate-800 font-bold">{log.temp.toFixed(1)}°C</span> / {log.humidity}%
-                          </td>
-                          <td className="p-4">
-                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${vpdInfo.statusClass}`}>
-                              {log.vpd.toFixed(2)} kPa
-                            </span>
-                          </td>
-                          <td className="p-4 text-xs text-slate-500 leading-normal">
-                            {log.water_amount || log.ph || log.ec ? (
-                              <div>
-                                {log.water_amount && <span className="block text-slate-800 font-bold">{log.water_amount} L agua</span>}
-                                {(log.ph || log.ec) && (
-                                  <span>pH: {log.ph || '-.-'} • EC: {log.ec || '-.-'}</span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 italic">Sin riego</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-xs text-slate-500 leading-normal">
-                            {log.ph_runoff || log.ec_runoff ? (
-                              <div>
-                                <span className="block text-emerald-600 font-bold">Runoff</span>
-                                <span>pH: {log.ph_runoff || '-.-'} • EC: {log.ec_runoff || '-.-'}</span>
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 italic">Sin medir</span>
-                            )}
-                          </td>
-                          <td className="p-4">
-                            {log.image_url ? (
+                        return (
+                          <tr key={log.id} className="hover:bg-slate-50/50 transition">
+                            <td className="p-4 text-slate-600 font-semibold">{formattedDate}</td>
+                            <td className="p-4 text-emerald-600 font-bold truncate max-w-[120px]">{lotName}</td>
+                            <td className="p-4 text-slate-500">
+                              <span className="text-slate-800 font-bold">{log.temp.toFixed(1)}°C</span> / {log.humidity}%
+                            </td>
+                            <td className="p-4">
+                              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${vpdInfo.statusClass}`}>
+                                {log.vpd.toFixed(2)} kPa
+                              </span>
+                            </td>
+                            <td className="p-4 text-xs text-slate-500 leading-normal">
+                              {log.water_amount || log.ph || log.ec ? (
+                                <div>
+                                  {log.water_amount && <span className="block text-slate-800 font-bold">{log.water_amount} L agua</span>}
+                                  {(log.ph || log.ec) && (
+                                    <span>pH: {log.ph || '-.-'} • EC: {log.ec || '-.-'}</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic">Sin riego</span>
+                              )}
+                            </td>
+                            <td className="p-4 text-xs text-slate-500 leading-normal">
+                              {log.ph_runoff || log.ec_runoff ? (
+                                <div>
+                                  <span className="block text-emerald-600 font-bold">Runoff</span>
+                                  <span>pH: {log.ph_runoff || '-.-'} • EC: {log.ec_runoff || '-.-'}</span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic">Sin medir</span>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              {log.image_url ? (
+                                <button
+                                  onClick={() => setActivePhotoUrl(log.image_url!)}
+                                  className="p-1.5 hover:bg-slate-100 text-emerald-600 hover:text-emerald-700 rounded-lg transition"
+                                  title="Ver foto de la cama"
+                                >
+                                  <ImageIcon size={18} />
+                                </button>
+                              ) : (
+                                <span className="text-slate-300">-</span>
+                              )}
+                            </td>
+                            <td className="p-4 text-slate-600 font-semibold truncate max-w-[100px]">{log.watered_by || 'José'}</td>
+                            <td className="p-4 text-center">
                               <button
-                                onClick={() => setActivePhotoUrl(log.image_url!)}
-                                className="p-1.5 hover:bg-slate-100 text-emerald-600 hover:text-emerald-700 rounded-lg transition"
-                                title="Ver foto de la cama"
+                                onClick={() => deleteLog(log.id)}
+                                className="p-1.5 hover:bg-red-50 text-slate-500 hover:text-red-500 rounded-lg border border-transparent transition"
+                                title="Eliminar Registro"
                               >
-                                <ImageIcon size={18} />
+                                <Trash2 size={16} />
                               </button>
-                            ) : (
-                              <span className="text-slate-300">-</span>
-                            )}
-                          </td>
-                          <td className="p-4 text-slate-600 font-semibold truncate max-w-[100px]">{log.watered_by || 'José'}</td>
-                          <td className="p-4 text-center">
-                            <button
-                              onClick={() => deleteLog(log.id)}
-                              className="p-1.5 hover:bg-red-50 text-slate-455 hover:text-red-500 rounded-lg border border-transparent transition"
-                              title="Eliminar Registro"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()
                   ) : (
                     <tr>
                       <td colSpan={9} className="p-12 text-center text-slate-400 font-semibold">
@@ -768,109 +784,155 @@ export const LogsView = () => {
                   )}
                 </tbody>
               </table>
+              {/* Desktop Pagination */}
+              {filteredLogs.length > LOGS_PER_PAGE && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    ← Anterior
+                  </button>
+                  <span className="text-xs font-semibold text-slate-500">
+                    Página {currentPage} de {Math.ceil(filteredLogs.length / LOGS_PER_PAGE)}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredLogs.length / LOGS_PER_PAGE), p + 1))}
+                    disabled={currentPage === Math.ceil(filteredLogs.length / LOGS_PER_PAGE)}
+                    className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* VISTA MÓVIL: TARJETAS DIAGNÓSTICAS DE FÁCIL ACCESO */}
             <div className="block md:hidden flex-1 p-4 space-y-4 overflow-y-auto max-h-[75vh]">
               {filteredLogs.length > 0 ? (
-                filteredLogs.map(log => {
-                  const lot = lots.find(l => l.id === log.lot_id);
-                  const lotName = lot ? lot.name : 'Lote Desconocido';
-                  const vpdInfo = getVPDInfo(log.vpd);
+                <>
+                  {filteredLogs.slice((currentPage - 1) * LOGS_PER_PAGE, currentPage * LOGS_PER_PAGE).map(log => {
+                    const lot = lots.find(l => l.id === log.lot_id);
+                    const lotName = lot ? lot.name : 'Lote Desconocido';
+                    const vpdInfo = getVPDInfo(log.vpd);
 
-                  const formattedDate = new Date(log.date).toLocaleString('es-AR', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  });
+                    const formattedDate = new Date(log.date).toLocaleString('es-AR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
 
-                  return (
-                    <div key={log.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5 shadow-sm hover:border-slate-300 transition duration-150">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-extrabold text-slate-900 text-sm">{lotName}</h4>
-                          <p className="text-[10px] text-slate-400 font-bold">{formattedDate}</p>
-                        </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200/60 text-slate-600 rounded-full border border-slate-300/30">
-                          {log.watered_by || 'José'}
-                        </span>
-                      </div>
-
-                      {/* Clima & VPD */}
-                      <div className="grid grid-cols-3 gap-2 py-2 border-t border-b border-slate-200/50 text-center text-xs font-semibold">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Temp</span>
-                          <span className="font-black text-slate-800">{log.temp.toFixed(1)}°C</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Hum</span>
-                          <span className="font-black text-slate-800">{log.humidity}%</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">VPD</span>
-                          <span className={`inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-0.5 ${vpdInfo.statusClass}`}>
-                            {log.vpd.toFixed(2)}
+                    return (
+                      <div key={log.id} className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5 shadow-sm hover:border-slate-300 transition duration-150">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-extrabold text-slate-900 text-sm">{lotName}</h4>
+                            <p className="text-[10px] text-slate-400 font-bold">{formattedDate}</p>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200/60 text-slate-600 rounded-full border border-slate-300/30">
+                            {log.watered_by || 'José'}
                           </span>
                         </div>
-                      </div>
 
-                      {/* Riego vs Runoff */}
-                      <div className="grid grid-cols-2 gap-4 text-xs">
-                        <div>
-                          <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Entrada (Riego)</span>
-                          {log.water_amount || log.ph || log.ec ? (
-                            <div className="font-bold text-slate-700 mt-1 space-y-0.5 leading-snug">
-                              {log.water_amount && <span className="block">💧 {log.water_amount} L</span>}
-                              <span className="block text-slate-800">pH: {log.ph || '-.-'} | EC: {log.ec || '-.-'}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 italic text-[10px] block mt-1">Sin riego</span>
-                          )}
+                        {/* Clima & VPD */}
+                        <div className="grid grid-cols-3 gap-2 py-2 border-t border-b border-slate-200/50 text-center text-xs font-semibold">
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Temp</span>
+                            <span className="font-black text-slate-800">{log.temp.toFixed(1)}°C</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Hum</span>
+                            <span className="font-black text-slate-800">{log.humidity}%</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">VPD</span>
+                            <span className={`inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-0.5 ${vpdInfo.statusClass}`}>
+                              {log.vpd.toFixed(2)}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Retorno (Runoff)</span>
-                          {log.ph_runoff || log.ec_runoff ? (
-                            <div className="font-bold text-emerald-700 mt-1 space-y-0.5 leading-snug">
-                              <span className="block">🌱 Drenaje</span>
-                              <span className="block text-emerald-800">pH: {log.ph_runoff || '-.-'} | EC: {log.ec_runoff || '-.-'}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 italic text-[10px] block mt-1">Sin medir</span>
-                          )}
+
+                        {/* Riego vs Runoff */}
+                        <div className="grid grid-cols-2 gap-4 text-xs">
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Entrada (Riego)</span>
+                            {log.water_amount || log.ph || log.ec ? (
+                              <div className="font-bold text-slate-700 mt-1 space-y-0.5 leading-snug">
+                                {log.water_amount && <span className="block">💧 {log.water_amount} L</span>}
+                                <span className="block text-slate-800">pH: {log.ph || '-.-'} | EC: {log.ec || '-.-'}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic text-[10px] block mt-1">Sin riego</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Retorno (Runoff)</span>
+                            {log.ph_runoff || log.ec_runoff ? (
+                              <div className="font-bold text-emerald-700 mt-1 space-y-0.5 leading-snug">
+                                <span className="block">🌱 Drenaje</span>
+                                <span className="block text-emerald-800">pH: {log.ph_runoff || '-.-'} | EC: {log.ec_runoff || '-.-'}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic text-[10px] block mt-1">Sin medir</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      {log.notes && (
-                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed italic bg-white p-2 rounded-lg border border-slate-100">
-                          {log.notes}
-                        </p>
-                      )}
-
-                      {/* Botones y foto */}
-                      <div className="flex justify-between items-center pt-2 border-t border-slate-200/50">
-                        {log.image_url ? (
-                          <button
-                            onClick={() => setActivePhotoUrl(log.image_url!)}
-                            className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700"
-                          >
-                            <ImageIcon size={14} />
-                            Ver foto de medidores
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic font-semibold">Sin foto</span>
+                        {log.notes && (
+                          <p className="text-[11px] text-slate-500 font-medium leading-relaxed italic bg-white p-2 rounded-lg border border-slate-100">
+                            {log.notes}
+                          </p>
                         )}
-                        <button
-                          onClick={() => deleteLog(log.id)}
-                          className="text-xs text-red-600 hover:text-red-600 font-bold flex items-center gap-1"
-                        >
-                          <Trash2 size={13} />
-                          Eliminar
-                        </button>
+
+                        {/* Botones y foto */}
+                        <div className="flex justify-between items-center pt-2 border-t border-slate-200/50">
+                          {log.image_url ? (
+                            <button
+                              onClick={() => setActivePhotoUrl(log.image_url!)}
+                              className="flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700"
+                            >
+                              <ImageIcon size={14} />
+                              Ver foto de medidores
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic font-semibold">Sin foto</span>
+                          )}
+                          <button
+                            onClick={() => deleteLog(log.id)}
+                            className="text-xs text-red-600 hover:text-red-600 font-bold flex items-center gap-1"
+                          >
+                            <Trash2 size={13} />
+                            Eliminar
+                          </button>
+                        </div>
                       </div>
+                    );
+                  })}
+                  {/* Mobile Pagination */}
+                  {filteredLogs.length > LOGS_PER_PAGE && (
+                    <div className="flex items-center justify-between pt-2">
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      >
+                        ← Anterior
+                      </button>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {currentPage} / {Math.ceil(filteredLogs.length / LOGS_PER_PAGE)}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredLogs.length / LOGS_PER_PAGE), p + 1))}
+                        disabled={currentPage === Math.ceil(filteredLogs.length / LOGS_PER_PAGE)}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      >
+                        Siguiente →
+                      </button>
                     </div>
-                  );
-                })
+                  )}
+                </>
               ) : (
                 <div className="py-12 text-center text-slate-400 font-semibold">
                   <Activity size={32} className="mx-auto text-emerald-500/20 mb-2" />

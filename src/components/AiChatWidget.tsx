@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useGrow } from '../context/GrowContext';
 import { sendMessageToAgent } from '../utils/aiAgent';
 import type { MessageHistoryItem } from '../utils/aiAgent';
-import { Sparkles, X, Send, Bot, Key, Loader2, CheckCircle, Settings } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Key, CheckCircle, Settings } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 interface ChatMessage {
@@ -17,14 +17,21 @@ export const AiChatWidget = () => {
   const { lots, logs, tasks, addLog, addTask, toggleTask, activeNutrientLine, irrigationMethod } = useGrow();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('grow_chat_history');
+      if (saved) {
+        const parsed = JSON.parse(saved) as ChatMessage[];
+        return parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+      }
+    } catch { /* ignorar */ }
+    return [{
       id: 'welcome',
       sender: 'agent',
       text: '¡Hola! Soy tu **Asistente GrowIA**. Puedo analizar tus datos de escorrentía (runoff), sugerirte recetas nutricionales, diagnosticar problemas climáticos o registrar labores. \n\n¿En qué te puedo ayudar hoy?',
       timestamp: new Date()
-    }
-  ]);
+    }];
+  });
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -52,6 +59,15 @@ export const AiChatWidget = () => {
       setShowConfig(true);
     }
   }, []);
+
+  // Persistir mensajes en sessionStorage
+  useEffect(() => {
+    try {
+      // Guardar solo los últimos 30 mensajes para no saturar sessionStorage
+      const toSave = messages.slice(-30);
+      sessionStorage.setItem('grow_chat_history', JSON.stringify(toSave));
+    } catch { /* ignorar si sessionStorage está lleno */ }
+  }, [messages]);
 
   // Scroll automático
   const scrollToBottom = () => {
@@ -110,7 +126,6 @@ export const AiChatWidget = () => {
     const userMsgText = inputText.trim();
     setInputText('');
 
-    // Agregar mensaje de usuario a la UI
     const newUserMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
       sender: 'user',
@@ -121,100 +136,101 @@ export const AiChatWidget = () => {
     setMessages(prev => [...prev, newUserMsg]);
     setIsLoading(true);
 
-    // Mapear historial al formato del agente
-    const history: MessageHistoryItem[] = messages
-      .filter(m => m.sender === 'user' || m.sender === 'agent')
-      .slice(-10) // Mandar solo los últimos 10 para ahorrar contexto
-      .map(m => ({
-        role: m.sender === 'user' ? 'user' : 'model',
-        parts: m.text
-      }));
+    try {
+      const history: MessageHistoryItem[] = messages
+        .filter(m => m.sender === 'user' || m.sender === 'agent')
+        .slice(-10)
+        .map(m => ({
+          role: m.sender === 'user' ? 'user' : 'model',
+          parts: m.text
+        }));
 
-    const response = await sendMessageToAgent(userMsgText, history, {
-      lots,
-      logs,
-      tasks,
-      activeNutrientLine,
-      irrigationMethod
-    });
+      const response = await sendMessageToAgent(userMsgText, history, {
+        lots,
+        logs,
+        tasks,
+        activeNutrientLine,
+        irrigationMethod
+      });
 
-    setIsLoading(false);
+      const agentMsgId = `agt-${Date.now()}`;
+      const newAgentMsg: ChatMessage = {
+        id: agentMsgId,
+        sender: 'agent',
+        text: response.text,
+        timestamp: new Date()
+      };
 
-    // Agregar respuesta del agente a la UI
-    const agentMsgId = `agt-${Date.now()}`;
-    const newAgentMsg: ChatMessage = {
-      id: agentMsgId,
-      sender: 'agent',
-      text: response.text,
-      timestamp: new Date()
-    };
+      if (response.action) {
+        const { action, payload } = response.action;
+        let statusText = '';
 
-    // Procesar acción si el agente la retornó
-    if (response.action) {
-      const { action, payload } = response.action;
-      let statusText = '';
-
-      try {
-        if (action === 'CREATE_TASK') {
-          // Validar payload
-          if (payload.title && payload.due_date) {
-            // Mapear id si no existe pero se tiene el nombre
-            let lotId = payload.lot_id || '';
-            if (!lotId && payload.lot_name) {
-              const matchingLot = lots.find(l => l.name.toLowerCase() === payload.lot_name.toLowerCase());
-              if (matchingLot) lotId = matchingLot.id;
+        try {
+          if (action === 'CREATE_TASK') {
+            if (payload.title && payload.due_date) {
+              let lotId = payload.lot_id || '';
+              if (!lotId && payload.lot_name) {
+                const matchingLot = lots.find(l => l.name.toLowerCase() === payload.lot_name.toLowerCase());
+                if (matchingLot) lotId = matchingLot.id;
+              }
+               await addTask({
+                lot_id: lotId || '',
+                title: payload.title,
+                date: payload.due_date || payload.date || new Date().toISOString().split('T')[0],
+                type: payload.type || 'otro',
+                notes: payload.notes || ''
+              });
+              statusText = `✓ Tarea "${payload.title}" creada en la base de datos.`;
+            } else {
+              statusText = `⚠️ Error al crear tarea: Datos incompletos.`;
             }
-
-             await addTask({
-              lot_id: lotId || '',
-              title: payload.title,
-              date: payload.due_date || payload.date || new Date().toISOString().split('T')[0],
-              type: payload.type || 'otro',
-              notes: payload.notes || ''
-            });
-
-            statusText = `✓ Tarea "${payload.title}" creada en la base de datos.`;
-          } else {
-            statusText = `⚠️ Error al crear tarea: Datos incompletos.`;
+          } else if (action === 'COMPLETE_TASK') {
+            if (payload.task_id) {
+              await toggleTask(payload.task_id);
+              statusText = `✓ Tarea marcada como completada.`;
+            } else {
+              statusText = `⚠️ Error: ID de tarea no especificado.`;
+            }
+          } else if (action === 'ADD_LOG') {
+            if (payload.lot_id && payload.temp && payload.humidity) {
+              await addLog({
+                lot_id: payload.lot_id,
+                temp: Number(payload.temp),
+                humidity: Number(payload.humidity),
+                ph: Number(payload.ph || 5.8),
+                ec: Number(payload.ec || 1.2),
+                ph_runoff: payload.ph_runoff ? Number(payload.ph_runoff) : undefined,
+                ec_runoff: payload.ec_runoff ? Number(payload.ec_runoff) : undefined,
+                notes: payload.notes || 'Registro creado por GrowIA',
+                water_amount: payload.water_liters ? Number(payload.water_liters) : undefined,
+                watered_by: payload.watered_by || 'GrowIA',
+                image_url: undefined
+              });
+              statusText = `✓ Riego registrado en la bitácora con éxito.`;
+            } else {
+              statusText = `⚠️ Error al registrar riego: Faltan parámetros mínimos.`;
+            }
           }
-        } else if (action === 'COMPLETE_TASK') {
-          if (payload.task_id) {
-            await toggleTask(payload.task_id);
-            statusText = `✓ Tarea marcada como completada.`;
-          } else {
-            statusText = `⚠️ Error: ID de tarea no especificado.`;
-          }
-        } else if (action === 'ADD_LOG') {
-          if (payload.lot_id && payload.temp && payload.humidity) {
-            await addLog({
-              lot_id: payload.lot_id,
-              temp: Number(payload.temp),
-              humidity: Number(payload.humidity),
-              ph: Number(payload.ph || 5.8),
-              ec: Number(payload.ec || 1.2),
-              ph_runoff: payload.ph_runoff ? Number(payload.ph_runoff) : undefined,
-              ec_runoff: payload.ec_runoff ? Number(payload.ec_runoff) : undefined,
-              notes: payload.notes || 'Registro creado por GrowIA',
-              water_amount: payload.water_liters ? Number(payload.water_liters) : undefined,
-              watered_by: payload.watered_by || 'GrowIA',
-              image_url: undefined
-            });
-            statusText = `✓ Riego registrado en la bitácora con éxito.`;
-          } else {
-            statusText = `⚠️ Error al registrar riego: Faltan parámetros mínimos (Lote, Temp, Humedad).`;
-          }
+        } catch (err: any) {
+          console.error('Error ejecutando acción de IA:', err);
+          statusText = `❌ Error al ejecutar labor: ${err.message || err}`;
         }
-      } catch (err: any) {
-        console.error('Error ejecutando acción de IA:', err);
-        statusText = `❌ Error al ejecutar labor en Supabase: ${err.message || err}`;
+
+        if (statusText) newAgentMsg.statusText = statusText;
       }
 
-      if (statusText) {
-        newAgentMsg.statusText = statusText;
-      }
+      setMessages(prev => [...prev, newAgentMsg]);
+    } catch (err: any) {
+      console.error('Error en handleSendMessage:', err);
+      setMessages(prev => [...prev, {
+        id: `err-${Date.now()}`,
+        sender: 'system',
+        text: `❌ Error inesperado: ${err.message || 'Por favor, intenta de nuevo.'}`,
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsLoading(false);
     }
-
-    setMessages(prev => [...prev, newAgentMsg]);
   };
 
   // Función simple para formatear texto en HTML básico (Markdown simple)
@@ -412,12 +428,22 @@ export const AiChatWidget = () => {
                   );
                 })}
 
-                {/* Cargando */}
+                {/* Indicador de escritura (typing indicator) */}
                 {isLoading && (
                   <div className="flex items-start space-x-2">
-                    <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-4 py-3 text-xs text-slate-500 shadow-2xs flex items-center gap-2">
-                      <Loader2 size={12} className="animate-spin text-emerald-500" />
-                      <span>GrowIA está formulando respuesta...</span>
+                    <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-4 py-3 shadow-2xs flex items-center gap-1.5">
+                      <span
+                        className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce"
+                        style={{ animationDelay: '0ms' }}
+                      />
+                      <span
+                        className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce"
+                        style={{ animationDelay: '150ms' }}
+                      />
+                      <span
+                        className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce"
+                        style={{ animationDelay: '300ms' }}
+                      />
                     </div>
                   </div>
                 )}

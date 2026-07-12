@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed, getVPDInfo, getAthenaClimateTargets } from '../utils/calculations';
-import { Thermometer, Droplets, Wind, Sprout, Plus, Calendar, CheckCircle2, Dna, Image as ImageIcon, Activity, Clock, AlertCircle } from 'lucide-react';
+import { Thermometer, Droplets, Wind, Sprout, Plus, Calendar, CheckCircle2, Dna, Image as ImageIcon, Activity, Clock, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { getLunarInfo, LUNAR_DAY_META, LUNAR_PHASE_META } from '../utils/lunar';
 import { getWeeklyIrrigationSchedule, analyzeRunoffAndStrategy } from '../utils/irrigationEngine';
 import { Line } from 'react-chartjs-2';
@@ -31,7 +31,7 @@ ChartJS.register(
 export const DashboardView = () => {
   const { 
     lots, logs, tasks, toggleTask, addLog, 
-    activeNutrientLine, irrigationMethod
+    activeNutrientLine, irrigationMethod, helpers
   } = useGrow();
   const [showQuickLog, setShowQuickLog] = useState(false);
   const [activePhotoUrl, setActivePhotoUrl] = useState<string | null>(null);
@@ -42,7 +42,10 @@ export const DashboardView = () => {
   const [humidity, setHumidity] = useState('');
   const [ph, setPh] = useState('');
   const [ec, setEc] = useState('');
+  const [phRunoff, setPhRunoff] = useState('');
+  const [ecRunoff, setEcRunoff] = useState('');
   const [water, setWater] = useState('');
+  const [quickWateredBy, setQuickWateredBy] = useState('');
   const [notes, setNotes] = useState('');
 
   const activeLots = lots.filter(l => !l.is_archived);
@@ -52,6 +55,7 @@ export const DashboardView = () => {
 
   // Obtener últimas métricas registradas
   const lastLog = logs.length > 0 ? logs[0] : null;
+  const prevLog = logs.length > 1 ? logs[1] : null;
   const vpdInfo = lastLog ? getVPDInfo(lastLog.vpd) : null;
   const recentWaterings = logs.filter(l => l.water_amount && l.water_amount > 0).slice(0, 5);
 
@@ -111,6 +115,14 @@ export const DashboardView = () => {
     return num >= 10 ? num / 1000 : num;
   };
 
+  // Tendencias comparando último log con el anterior
+  const getTrend = (current: number | undefined, previous: number | undefined) => {
+    if (current === undefined || previous === undefined) return 'neutral';
+    const diff = current - previous;
+    if (Math.abs(diff) < 0.1) return 'neutral';
+    return diff > 0 ? 'up' : 'down';
+  };
+
   const handleQuickLogSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLot || !temp || !humidity) return;
@@ -121,7 +133,10 @@ export const DashboardView = () => {
       humidity: parseFloat(humidity),
       ph: ph ? parseFloat(ph) : undefined,
       ec: formatEC(ec),
+      ph_runoff: phRunoff ? parseFloat(phRunoff) : undefined,
+      ec_runoff: ecRunoff ? parseFloat(ecRunoff) : undefined,
       water_amount: water ? parseFloat(water) : undefined,
+      watered_by: quickWateredBy || undefined,
       notes: notes || undefined
     });
 
@@ -130,7 +145,10 @@ export const DashboardView = () => {
     setHumidity('');
     setPh('');
     setEc('');
+    setPhRunoff('');
+    setEcRunoff('');
     setWater('');
+    setQuickWateredBy('');
     setNotes('');
     setShowQuickLog(false);
   };
@@ -253,7 +271,7 @@ export const DashboardView = () => {
                             ✓ Regado
                           </span>
                         ) : (
-                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-705 text-amber-700 border border-amber-200 rounded animate-pulse">
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-100 text-amber-700 border border-amber-200 rounded animate-pulse">
                             ⚠️ Pendiente
                           </span>
                         )}
@@ -302,7 +320,6 @@ export const DashboardView = () => {
         );
       })()}
 
-      {/* Grid de Métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <MetricCard
           icon={<Thermometer size={24} />}
@@ -323,6 +340,7 @@ export const DashboardView = () => {
                     : 'Ideal'
               : 'Sin datos'
           }
+          trend={getTrend(lastLog?.temp, prevLog?.temp)}
           theme="blue"
         />
         <MetricCard
@@ -344,6 +362,7 @@ export const DashboardView = () => {
                     : 'Adecuado'
               : 'Sin datos'
           }
+          trend={getTrend(lastLog?.humidity, prevLog?.humidity)}
           theme="green"
         />
         <MetricCard
@@ -364,6 +383,7 @@ export const DashboardView = () => {
               : 'Sin datos'
           }
           badgeClass={vpdInfo ? vpdInfo.statusClass : ''}
+          trend={getTrend(lastLog?.vpd, prevLog?.vpd)}
           theme="amber"
         />
         <MetricCard
@@ -373,6 +393,7 @@ export const DashboardView = () => {
           subtext={`${activeLots.reduce((acc, curr) => acc + curr.plant_count, 0)} plantas en curso`}
           theme="emerald"
         />
+
       </div>
 
       {/* Gráfico y Tareas del Día */}
@@ -492,7 +513,7 @@ export const DashboardView = () => {
                           <span className="text-slate-300">-</span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-600 font-semibold">{log.watered_by || 'José'}</td>
+                      <td className="py-3.5 px-4 text-slate-600 font-semibold">{log.watered_by || '–'}</td>
                     </tr>
                   );
                 })}
@@ -594,92 +615,58 @@ export const DashboardView = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-600 mb-1">Temperatura (°C) *</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={temp}
-                    onChange={(e) => setTemp(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
-                    placeholder="Ej: 24"
-                    required
-                  />
+                  <input type="number" step="0.1" value={temp} onChange={(e) => setTemp(e.target.value)} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500" placeholder="Ej: 24" required />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-600 mb-1">Humedad (%) *</label>
-                  <input
-                    type="number"
-                    value={humidity}
-                    onChange={(e) => setHumidity(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
-                    placeholder="Ej: 55"
-                    required
-                  />
+                  <input type="number" value={humidity} onChange={(e) => setHumidity(e.target.value)} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500" placeholder="Ej: 55" required />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-600 mb-1">pH Riego</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={ph}
-                    onChange={(e) => setPh(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
-                    placeholder="Ej: 6.2"
-                  />
+                  <input type="number" step="0.1" value={ph} onChange={(e) => setPh(e.target.value)} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500" placeholder="Ej: 5.8" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-1">EC Riego <span className="text-slate-400 font-normal">(mS/cm o μS)</span></label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={ec}
-                    onChange={(e) => setEc(e.target.value.replace(/[^0-9.]/g, ''))}
-                    onBlur={() => { const n = parseFloat(ec); if (!isNaN(n) && n >= 10) setEc((n/1000).toFixed(2)); }}
-                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
-                    placeholder="Ej: 1.2 o 1200"
-                  />
-                  {ec && parseFloat(ec) >= 10 && <p className="text-[10px] text-emerald-600 font-bold mt-1">→ Se guardará como {(parseFloat(ec) / 1000).toFixed(2)} mS/cm</p>}
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">EC Riego (mS/cm)</label>
+                  <input type="text" inputMode="decimal" value={ec} onChange={(e) => setEc(e.target.value.replace(/[^0-9.]/g, ''))} onBlur={() => { const n = parseFloat(ec); if (!isNaN(n) && n >= 10) setEc((n/1000).toFixed(2)); }} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500" placeholder="Ej: 1.2" />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">pH Drenaje</label>
+                  <input type="number" step="0.1" value={phRunoff} onChange={(e) => setPhRunoff(e.target.value)} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500" placeholder="Ej: 6.2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">EC Drenaje (mS/cm)</label>
+                  <input type="text" inputMode="decimal" value={ecRunoff} onChange={(e) => setEcRunoff(e.target.value.replace(/[^0-9.]/g, ''))} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500" placeholder="Ej: 1.8" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-600 mb-1">Agua (L)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={water}
-                    onChange={(e) => setWater(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
-                    placeholder="Ej: 5"
-                  />
+                  <input type="number" step="0.1" value={water} onChange={(e) => setWater(e.target.value)} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500" placeholder="Ej: 5" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">Quién Regó</label>
+                  <select value={quickWateredBy} onChange={(e) => setQuickWateredBy(e.target.value)} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm">
+                    <option value="">Sin especificar</option>
+                    {helpers.map(h => <option key={h.id} value={h.name}>{h.name}</option>)}
+                  </select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">Notas / Observaciones</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500"
-                  rows={2}
-                  placeholder="Detalles sobre el riego, control foliar..."
-                ></textarea>
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500" rows={2} placeholder="Detalles sobre el riego, control foliar..." />
               </div>
 
               <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowQuickLog(false)}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-200 transition duration-150"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150"
-                >
-                  Guardar Registro
-                </button>
+                <button type="button" onClick={() => setShowQuickLog(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-200 transition duration-150">Cancelar</button>
+                <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition duration-150">Guardar Registro</button>
               </div>
             </form>
           </div>
@@ -718,15 +705,24 @@ interface MetricCardProps {
   subtext: string;
   badgeClass?: string;
   theme: 'blue' | 'green' | 'amber' | 'emerald';
+  trend?: 'up' | 'down' | 'neutral';
 }
 
-const MetricCard = ({ icon, title, value, subtext, badgeClass, theme }: MetricCardProps) => {
+const MetricCard = ({ icon, title, value, subtext, badgeClass, theme, trend }: MetricCardProps) => {
   const themes = {
-    blue: 'text-blue-600 bg-blue-50 border-blue-100',
-    green: 'text-emerald-600 bg-emerald-50 border-emerald-100',
-    amber: 'text-amber-600 bg-amber-50 border-amber-100',
+    blue:    'text-blue-600 bg-blue-50 border-blue-100',
+    green:   'text-emerald-600 bg-emerald-50 border-emerald-100',
+    amber:   'text-amber-600 bg-amber-50 border-amber-100',
     emerald: 'text-emerald-600 bg-emerald-50 border-emerald-100'
   };
+
+  const trendEl = trend && trend !== 'neutral' ? (
+    <span className={`ml-1 inline-flex items-center ${trend === 'up' ? 'text-emerald-500' : 'text-red-400'}`}>
+      {trend === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+    </span>
+  ) : trend === 'neutral' ? (
+    <span className="ml-1 inline-flex items-center text-slate-300"><Minus size={12} /></span>
+  ) : null;
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 hover:border-slate-300 transition duration-150 select-none shadow-sm">
@@ -735,12 +731,13 @@ const MetricCard = ({ icon, title, value, subtext, badgeClass, theme }: MetricCa
       </div>
       <div className="flex-1">
         <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">{title}</span>
-        <h3 className="text-2xl font-extrabold text-slate-900 mt-1">{value}</h3>
+        <div className="flex items-center gap-1">
+          <h3 className="text-2xl font-extrabold text-slate-900 mt-1">{value}</h3>
+          {trendEl}
+        </div>
         <div className="flex items-center gap-2 mt-1">
           {badgeClass ? (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeClass}`}>
-              {subtext}
-            </span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeClass}`}>{subtext}</span>
           ) : (
             <span className="text-xs text-slate-500 font-semibold">{subtext}</span>
           )}
@@ -749,3 +746,4 @@ const MetricCard = ({ icon, title, value, subtext, badgeClass, theme }: MetricCa
     </div>
   );
 };
+

@@ -290,11 +290,13 @@ export const ReportsView = () => {
 
     // Obtener la semana ISO de una fecha
     const getWeekKey = (dateStr: string) => {
-      const d = new Date(dateStr);
-      const startOfYear = new Date(d.getFullYear(), 0, 1);
-      const daysSinceStart = Math.floor((d.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
-      const weekNumber = Math.ceil((daysSinceStart + startOfYear.getDay() + 1) / 7);
-      return `S${weekNumber}`;
+      const d = new Date(dateStr + 'T00:00:00');
+      // Algoritmo ISO 8601: normalizar al jueves de la semana actual
+      const dayOfWeek = d.getDay() || 7; // 0 (dom) -> 7
+      d.setDate(d.getDate() + 4 - dayOfWeek); // Mover al jueves
+      const yearStart = new Date(d.getFullYear(), 0, 1);
+      const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+      return `S${weekNo}`;
     };
 
     // Recopilar todas las semanas únicas en orden

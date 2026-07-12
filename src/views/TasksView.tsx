@@ -210,7 +210,7 @@ export const TasksView = () => {
                     <select
                       value={type}
                       onChange={(e) => setType(e.target.value as Task['type'])}
-                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-855 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
+                      className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:border-emerald-500 text-sm shadow-sm"
                     >
                       <option value="riego">Riego</option>
                       <option value="fertilizante">Nutrientes</option>
@@ -510,6 +510,18 @@ export const TasksView = () => {
                       </div>
                     )}
                   </div>
+
+                  {selectedDate && (
+                    <button
+                      onClick={() => {
+                        setDate(selectedDate);
+                        setShowForm(true);
+                      }}
+                      className="w-full mt-3 py-2 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition flex items-center justify-center gap-1.5"
+                    >
+                      <Plus size={13} /> Crear tarea para este día
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

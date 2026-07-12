@@ -228,10 +228,14 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadSeedsToSupabase = async () => {
     const seeds = getSeeds();
     try {
-      await supabase.from('strains').insert(seeds.initialStrains);
-      await supabase.from('lots').insert(seeds.initialLots);
-      await supabase.from('logs').insert(seeds.initialLogs);
-      await supabase.from('tasks').insert(seeds.initialTasks);
+      const { error: e1 } = await supabase.from('strains').insert(seeds.initialStrains);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from('lots').insert(seeds.initialLots);
+      if (e2) throw e2;
+      const { error: e3 } = await supabase.from('logs').insert(seeds.initialLogs);
+      if (e3) throw e3;
+      const { error: e4 } = await supabase.from('tasks').insert(seeds.initialTasks);
+      if (e4) throw e4;
 
       setStrains(seeds.initialStrains);
       setLots(seeds.initialLots);
@@ -247,7 +251,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchData = async () => {
       try {
         setLoading(true);
-        await checkDbConnection();
+        // Ejecutar todas las queries en paralelo (sin checkDbConnection redundante)
         const [strainsRes, lotsRes, logsRes, tasksRes, helpersRes] = await Promise.all([
           supabase.from('strains').select('*'),
           supabase.from('lots').select('*'),
@@ -267,8 +271,15 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLogs(logsRes.data || []);
         setTasks(tasksRes.data || []);
         setHelpers(helpersRes.data || []);
-      } catch (err) {
+        // Actualizar estado de conexión con latencia real
+        setDbStatus('connected');
+      } catch (err: any) {
         logAppError("Cargando datos de Supabase", err);
+        if (err?.code === 'PGRST111' || err?.message?.includes('JWT') || err?.message?.includes('auth')) {
+          setDbStatus('auth_error');
+        } else {
+          setDbStatus('disconnected');
+        }
       } finally {
         setLoading(false);
       }
@@ -377,7 +388,7 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [...filtered, ...tasksToInsert];
       });
     } catch (err) {
-      console.error("Error al generar cronograma de tareas:", err);
+      logAppError("Generar Cronograma de Tareas", err);
     }
   };
 
@@ -385,9 +396,15 @@ export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveNutrientLineState(line);
     localStorage.setItem('activeNutrientLine', line);
     // Regenerar las tareas de todos los lotes no archivados
-    for (const lot of lots.filter(l => !l.is_archived)) {
-      await generateScheduleTasks(lot.id, lot.stage, lot.start_date, line);
-    }
+    // Usamos el estado actual de lots de forma directa para evitar closure stale
+    setLots(currentLots => {
+      const activeLots = currentLots.filter(l => !l.is_archived);
+      // Disparar las regeneraciones en background (sin bloquear el setter)
+      Promise.all(
+        activeLots.map(lot => generateScheduleTasks(lot.id, lot.stage, lot.start_date, line))
+      ).catch(err => logAppError('Regenerar Cronogramas por Línea de Nutrientes', err));
+      return currentLots; // No modificamos lots aquí, solo leemos
+    });
   };
 
   const setIrrigationMethod = (method: 'manual' | 'automated') => {
