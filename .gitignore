@@ -1,5 +1,7 @@
 # Logs
-logs
+# La barra inicial es importante: sin ella, `logs` coincide en CUALQUIER nivel y
+# se termina ignorando código fuente como src/views/logs/.
+/logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -8,11 +10,12 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+/dist
 dist-ssr
 *.local
 .env
 .env.*
+!.env.example
 
 
 # Editor directories and files
