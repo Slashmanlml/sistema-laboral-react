@@ -6,7 +6,7 @@ Revisión técnica completa del proyecto: corrección de bugs bloqueantes,
 endurecimiento de seguridad, mejoras de rendimiento, modularización de las vistas
 y cobertura de tests.
 
-**Resumen:** 83 archivos tocados, +8.455 / −5.202 líneas. De 2 a 11 archivos de
+**Resumen:** 89 archivos tocados, +8.455 / −5.202 líneas. De 2 a 11 archivos de
 test (76 tests). El proyecto pasa `typecheck` con `strict: true`, `lint` sin
 advertencias y `build` de producción.
 
@@ -132,7 +132,27 @@ fácilmente los 10: esas lecturas legítimas se guardaban divididas por mil.
 **Corrección:** el umbral pasó a 100 (`parseEC` en `src/utils/format.ts`). Una EC
 de 12,5 mS/cm ahora se guarda como 12,5.
 
-### 12. Otros
+### 12. El `.gitignore` excluía código fuente del repositorio
+
+Heredado de la plantilla de Vite, el `.gitignore` tenía el patrón `logs` sin
+barra inicial. En Git eso **coincide en cualquier nivel del árbol**, no sólo en la
+raíz: cuando la refactorización creó `src/views/logs/`, la carpeta entera
+(`LogForm`, `LogHistory`, `AthenaAssistant`, `WateringGuide`, `useLogForm`,
+`logWarnings`) quedó fuera del control de versiones sin ningún aviso.
+
+El build local pasaba porque los archivos existen en disco. El de Vercel falla,
+porque clona el repositorio y ahí no están:
+
+```
+src/views/LogsView.tsx(9,25): error TS2307: Cannot find module './logs/LogForm'
+```
+
+Por el mismo motivo, `.env.example` caía bajo el patrón `.env.*`.
+
+**Corrección:** `logs` → `/logs` y `dist` → `/dist` (anclados a la raíz), más una
+excepción `!.env.example`.
+
+### 13. Otros
 
 - **Tendencias sin sentido:** las flechas ▲▼ de las métricas comparaban
   `logs[0]` con `logs[1]`, que podían ser de **lotes distintos**. Ahora comparan
