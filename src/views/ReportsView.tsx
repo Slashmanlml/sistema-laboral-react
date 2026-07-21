@@ -2,43 +2,20 @@ import { useState, useMemo } from 'react';
 import { useGrow } from '../context/GrowContext';
 import { BarChart3, Filter, Image as ImageIcon, TrendingUp, Droplets, X, Calendar } from 'lucide-react';
 import { Line, Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from 'chart.js';
-
-// Registrar componentes de Chart.js necesarios
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+import { baseChartOptions } from '../lib/chartSetup';
+import { formatDayMonth, formatHeaderDate } from '../utils/format';
+import { parseLocalDate } from '../utils/date';
+import { PhotoLightbox } from '../components/ui/PhotoLightbox';
 
 // ─── Componente principal de Reportes y Análisis ──────────────────────────────
 export const ReportsView = () => {
-  const { lots, logs } = useGrow();
+  const { logs, activeLots, lotsById } = useGrow();
 
   // ─── Estado de filtros ────────────────────────────────────────────────────────
   const [selectedLotId, setSelectedLotId] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [activePhotoUrl, setActivePhotoUrl] = useState<string | null>(null);
-
-  const activeLots = lots.filter(l => !l.is_archived);
 
   // ─── Logs filtrados según lote y rango de fechas ──────────────────────────────
   const filteredLogs = useMemo(() => {
@@ -51,13 +28,13 @@ export const ReportsView = () => {
 
     // Filtrar por fecha de inicio
     if (dateFrom) {
-      const from = new Date(dateFrom + 'T00:00:00');
+      const from = parseLocalDate(dateFrom);
       result = result.filter(l => new Date(l.date) >= from);
     }
 
     // Filtrar por fecha de fin
     if (dateTo) {
-      const to = new Date(dateTo + 'T23:59:59');
+      const to = new Date(`${dateTo}T23:59:59`);
       result = result.filter(l => new Date(l.date) <= to);
     }
 
@@ -66,26 +43,10 @@ export const ReportsView = () => {
   }, [logs, selectedLotId, dateFrom, dateTo]);
 
   // ─── Etiquetas del eje X (fechas formateadas) ────────────────────────────────
-  const chartLabels = filteredLogs.map(l => {
-    const date = new Date(l.date);
-    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
-  });
+  const chartLabels = filteredLogs.map(l => formatDayMonth(l.date));
 
   // ─── Opciones comunes para gráficos ──────────────────────────────────────────
-  const commonChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-        labels: { color: '#475569', font: { size: 11, weight: 'bold' as const } },
-      },
-    },
-    scales: {
-      x: { grid: { color: '#f1f5f9' }, ticks: { color: '#64748b', font: { size: 10 } } },
-      y: { grid: { color: '#f1f5f9' }, ticks: { color: '#64748b', font: { size: 10 } } },
-    },
-  };
+  const commonChartOptions = baseChartOptions;
 
   // ═══════════════════════════════════════════════════════════════════════════════
   // 1. CURVAS DE pH Y EC — Gráfico de líneas con doble eje Y
@@ -175,10 +136,7 @@ export const ReportsView = () => {
   // 2. DELTA EC (ABSORCIÓN) — Gráfico de barras positivas/negativas
   // ═══════════════════════════════════════════════════════════════════════════════
   const deltaEcLogs = filteredLogs.filter(l => l.ec != null && l.ec_runoff != null);
-  const deltaEcLabels = deltaEcLogs.map(l => {
-    const date = new Date(l.date);
-    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
-  });
+  const deltaEcLabels = deltaEcLogs.map(l => formatDayMonth(l.date));
   const deltaEcValues = deltaEcLogs.map(l => parseFloat(((l.ec_runoff ?? 0) - (l.ec ?? 0)).toFixed(2)));
 
   const deltaEcData = {
@@ -205,9 +163,9 @@ export const ReportsView = () => {
       },
       tooltip: {
         callbacks: {
-          label: (ctx: any) => {
+          label: (ctx: { parsed: { y: number | null } }) => {
             const val = ctx.parsed.y;
-            if (val === null || val === undefined) return '';
+            if (val === null) return '';
             if (val <= 0) return `ΔEC: ${val} mS/cm (absorción ✓)`;
             return `ΔEC: +${val} mS/cm (acumulación ⚠)`;
           },
@@ -288,9 +246,13 @@ export const ReportsView = () => {
     // Agrupar logs por semana (número ISO de semana) y lote
     const waterLogs = filteredLogs.filter(l => l.water_amount && l.water_amount > 0);
 
-    // Obtener la semana ISO de una fecha
-    const getWeekKey = (dateStr: string) => {
-      const d = new Date(dateStr + 'T00:00:00');
+    // Semana ISO de un timestamp.
+    // Ojo: `log.date` ya es un ISO completo. Antes se le concatenaba
+    // 'T00:00:00', lo que producía un Invalid Date y metía TODOS los riegos en
+    // un único bucket "SNaN".
+    const getWeekKey = (isoTimestamp: string) => {
+      const d = new Date(isoTimestamp);
+      d.setHours(0, 0, 0, 0);
       // Algoritmo ISO 8601: normalizar al jueves de la semana actual
       const dayOfWeek = d.getDay() || 7; // 0 (dom) -> 7
       d.setDate(d.getDate() + 4 - dayOfWeek); // Mover al jueves
@@ -313,8 +275,7 @@ export const ReportsView = () => {
     const lotColors = ['#10b981', '#0ea5e9', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899'];
 
     const datasets = relevantLotIds.map((lotId, idx) => {
-      const lot = lots.find(l => l.id === lotId);
-      const lotName = lot ? lot.name : 'Desconocido';
+      const lotName = lotsById.get(lotId)?.name ?? 'Desconocido';
       const color = lotColors[idx % lotColors.length];
 
       const weeklyTotals = weeks.map(weekKey => {
@@ -337,7 +298,7 @@ export const ReportsView = () => {
       labels: weeks,
       datasets,
     };
-  }, [filteredLogs, selectedLotId, lots]);
+  }, [filteredLogs, selectedLotId, lotsById]);
 
   const waterOptions = {
     responsive: true,
@@ -386,7 +347,7 @@ export const ReportsView = () => {
         </div>
         <div className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 font-semibold shadow-sm">
           <Calendar size={16} className="text-emerald-500" />
-          <span>{new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
+          <span className="capitalize">{formatHeaderDate(new Date())}</span>
         </div>
       </div>
 
@@ -536,13 +497,8 @@ export const ReportsView = () => {
         {logsWithPhotos.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {logsWithPhotos.map(log => {
-              const lot = lots.find(l => l.id === log.lot_id);
-              const lotName = lot ? lot.name : 'Lote Desconocido';
-              const formattedDate = new Date(log.date).toLocaleDateString('es-AR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: '2-digit',
-              });
+              const lotName = lotsById.get(log.lot_id)?.name ?? 'Lote Desconocido';
+              const formattedDate = formatDayMonth(log.date);
 
               return (
                 <button
@@ -574,35 +530,12 @@ export const ReportsView = () => {
         )}
       </div>
 
-      {/* ─── Modal de foto ampliada (lightbox) ───────────────────────────────── */}
-      {activePhotoUrl && (
-        <div
-          className="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 z-50"
-          onClick={() => setActivePhotoUrl(null)}
-        >
-          <div
-            className="relative max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-2xl p-2"
-            onClick={e => e.stopPropagation()}
-          >
-            <img
-              src={activePhotoUrl}
-              alt="Foto de la cama de cultivo"
-              className="max-h-[80vh] w-auto h-auto object-contain rounded-xl"
-            />
-            <button
-              onClick={() => setActivePhotoUrl(null)}
-              className="absolute top-4 right-4 bg-slate-900/60 hover:bg-slate-900 text-white p-2 rounded-full transition text-sm font-bold shadow-md"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-      )}
+      <PhotoLightbox url={activePhotoUrl} onClose={() => setActivePhotoUrl(null)} />
     </div>
   );
 };
 
-// ─── Componente de estado vacío reutilizable ──────────────────────────────────
+// ─── Estado vacío para el área de un gráfico ──────────────────────────────────
 const EmptyState = ({ message }: { message: string }) => (
   <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
     <BarChart3 size={36} className="text-slate-300 mb-2" />

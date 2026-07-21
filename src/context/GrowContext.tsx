@@ -1,100 +1,66 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Lot, Log, Task, Strain, Helper } from '../types/grow';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type {
+  AppError,
+  BackupFile,
+  DbStatus,
+  Helper,
+  IrrigationMethod,
+  Log,
+  Lot,
+  NutrientLine,
+  Strain,
+  Task,
+} from '../types/grow';
+import { isIrrigationMethod, isNutrientLine } from '../types/grow';
 import { calculateVPD } from '../utils/calculations';
-import { supabase } from '../lib/supabaseClient';
-import { 
-  VEG_SCHEDULE, 
-  FLOWER_SCHEDULE, 
-  ATHENA_PRO_VEG_SCHEDULE, 
-  ATHENA_PRO_FLOWER_SCHEDULE, 
-  ATHENA_BLENDED_VEG_SCHEDULE, 
-  ATHENA_BLENDED_FLOWER_SCHEDULE 
-} from '../utils/schedules';
+import { getSchedule, formatDose } from '../utils/schedules';
+import { addDaysToStr } from '../utils/date';
+import { isSupabaseConfigured } from '../lib/supabaseClient';
+import { useToast } from '../components/ToastProvider';
+import * as api from '../api/growApi';
+import { buildSeedData } from '../api/seedData';
 
-const getSeeds = () => {
-  const suffix = Math.random().toString(36).substring(2, 9) + '_' + Date.now();
-  const initialStrains: Strain[] = [
-    { id: `strain_${suffix}_1`, name: 'Moby Dick', type: 'Sativa' },
-    { id: `strain_${suffix}_2`, name: 'Gorilla Glue #4', type: 'Híbrido' },
-    { id: `strain_${suffix}_3`, name: 'Gelato #33', type: 'Híbrido' }
-  ];
+// ─── Contextos ────────────────────────────────────────────────────────────────
+//
+// El estado y las acciones viajan por separado a propósito: las acciones son
+// referencias estables, así que un componente que sólo dispara operaciones no se
+// vuelve a renderizar cuando cambia una colección.
 
-  const today = new Date();
-  const date20DaysAgo = new Date(today.getTime() - (20 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-  const date45DaysAgo = new Date(today.getTime() - (45 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-  const todayStr = today.toISOString().split('T')[0];
-  const tomorrowStr = new Date(today.getTime() + (24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-  const yesterdayStr = new Date(today.getTime() - (24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-
-  const lot1Id = `lot_${suffix}_1`;
-  const lot2Id = `lot_${suffix}_2`;
-
-  const initialLots: Lot[] = [
-    {
-      id: lot1Id,
-      name: 'Carpa Vegetativo - Cama 1',
-      strain: 'Moby Dick',
-      plant_count: 4,
-      stage: 'Vegetativo',
-      start_date: date20DaysAgo,
-      notes: 'Sustrato Fibra de Coco con perlita. LED 240W.',
-      is_archived: false
-    },
-    {
-      id: lot2Id,
-      name: 'Cama 1 de Flora',
-      strain: 'Zaza, Straw, PK, Skittles, DK',
-      plant_count: 8,
-      stage: 'Floración',
-      start_date: date45DaysAgo,
-      notes: 'Fibra de coco pura en camas elevadas. Riego mineral por goteo.',
-      is_archived: false
-    }
-  ];
-
-  const initialLogs: Log[] = [];
-  for (let i = 7; i >= 0; i--) {
-    const logTime = new Date(today.getTime() - (i * 3 * 60 * 60 * 1000));
-    const temp = parseFloat((23.5 + Math.sin(i) * 1.8).toFixed(1));
-    const humidity = Math.round(55 + Math.cos(i) * 8);
-    const vpd = calculateVPD(temp, humidity);
-    
-    initialLogs.push({
-      id: `log_${suffix}_${i}`,
-      lot_id: lot2Id,
-      date: logTime.toISOString(),
-      temp,
-      humidity,
-      vpd,
-      ph: 5.8,
-      ec: 1.4,
-      water_amount: 5,
-      notes: 'Riego con sales minerales.'
-    });
-  }
-
-  const initialTasks: Task[] = [
-    { id: `task_${suffix}_1`, lot_id: lot2Id, title: 'Riego con Nutrientes Flora', date: todayStr, type: 'fertilizante', notes: 'Dosis: A: 3.8 ml/L, B: 3.8 ml/L, C: 2.6 ml/L. pH 5.8, EC 1.44.', is_completed: false },
-    { id: `task_${suffix}_2`, lot_id: lot1Id, title: 'Aplicación Preventiva foliar', date: yesterdayStr, type: 'preventivo', notes: 'Pulverizar al apagarse las luces.', is_completed: true },
-    { id: `task_${suffix}_3`, lot_id: lot1Id, title: 'Defoliación de bajos y poda', date: tomorrowStr, type: 'poda', notes: 'Quitar brotes débiles de la zona baja.', is_completed: false }
-  ];
-
-  return { initialStrains, initialLots, initialLogs, initialTasks };
-};
-
-interface GrowContextType {
+interface GrowData {
   strains: Strain[];
   lots: Lot[];
   logs: Log[];
   tasks: Task[];
   helpers: Helper[];
+  /** Índice por id para evitar `lots.find()` dentro de bucles de render. */
+  lotsById: Map<string, Lot>;
+  activeLots: Lot[];
+  activeNutrientLine: NutrientLine;
+  irrigationMethod: IrrigationMethod;
+  appErrors: AppError[];
+  dbStatus: DbStatus;
+  dbLatency: number | null;
+  hasMoreLogs: boolean;
+  loadingMoreLogs: boolean;
+}
+
+interface GrowActions {
   addLot: (lot: Omit<Lot, 'id' | 'is_archived'>) => Promise<void>;
   editLot: (lot: Lot) => Promise<void>;
   archiveLot: (id: string) => Promise<void>;
   unarchiveLot: (id: string) => Promise<void>;
   addLog: (log: Omit<Log, 'id' | 'date' | 'vpd'>) => Promise<void>;
   deleteLog: (id: string) => Promise<void>;
+  loadMoreLogs: () => Promise<void>;
   addTask: (task: Omit<Task, 'id' | 'is_completed'>) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
@@ -105,627 +71,665 @@ interface GrowContextType {
   uploadPhoto: (file: File) => Promise<string | null>;
   clearDatabase: () => Promise<void>;
   loadDemoData: () => Promise<void>;
-  importDatabase: (data: any) => Promise<void>;
-  activeNutrientLine: 'ryanodine' | 'athena_pro' | 'athena_blended';
-  setActiveNutrientLine: (line: 'ryanodine' | 'athena_pro' | 'athena_blended') => Promise<void>;
-  irrigationMethod: 'manual' | 'automated';
-  setIrrigationMethod: (method: 'manual' | 'automated') => void;
-  appErrors: { id: string; timestamp: string; context: string; message: string; stack?: string }[];
+  importDatabase: (data: BackupFile) => Promise<void>;
+  setActiveNutrientLine: (line: NutrientLine) => Promise<void>;
+  setIrrigationMethod: (method: IrrigationMethod) => void;
   clearAppErrors: () => void;
-  dbStatus: 'connected' | 'disconnected' | 'auth_error' | 'config_error' | 'loading';
-  dbLatency: number | null;
   checkDbConnection: () => Promise<void>;
-  cleanOrphanedRecords: () => Promise<{ orphanedLogsCount: number; orphanedTasksCount: number }>;
+  cleanOrphanedRecords: () => Promise<api.OrphanCleanupResult>;
 }
 
-const GrowContext = createContext<GrowContextType | undefined>(undefined);
+const GrowDataContext = createContext<GrowData | undefined>(undefined);
+const GrowActionsContext = createContext<GrowActions | undefined>(undefined);
+
+// ─── Preferencias locales ─────────────────────────────────────────────────────
+
+const readNutrientLine = (): NutrientLine => {
+  const stored = localStorage.getItem('activeNutrientLine');
+  return isNutrientLine(stored) ? stored : 'ryanodine';
+};
+
+const readIrrigationMethod = (): IrrigationMethod => {
+  const stored = localStorage.getItem('irrigationMethod');
+  return isIrrigationMethod(stored) ? stored : 'manual';
+};
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export const GrowProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const toast = useToast();
+
   const [strains, setStrains] = useState<Strain[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [helpers, setHelpers] = useState<Helper[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMoreLogs, setHasMoreLogs] = useState(false);
+  const [loadingMoreLogs, setLoadingMoreLogs] = useState(false);
 
-  // Estados de Diagnóstico de Base de Datos y Consola de Errores
-  const [appErrors, setAppErrors] = useState<{ id: string; timestamp: string; context: string; message: string; stack?: string }[]>([]);
-  const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'auth_error' | 'config_error' | 'loading'>('loading');
+  const [appErrors, setAppErrors] = useState<AppError[]>([]);
+  const [dbStatus, setDbStatus] = useState<DbStatus>('loading');
   const [dbLatency, setDbLatency] = useState<number | null>(null);
 
-  // Estados de Configuración Athena
-  const [activeNutrientLine, setActiveNutrientLineState] = useState<'ryanodine' | 'athena_pro' | 'athena_blended'>(
-    (localStorage.getItem('activeNutrientLine') as any) || 'ryanodine'
-  );
-  const [irrigationMethod, setIrrigationMethodState] = useState<'manual' | 'automated'>(
-    (localStorage.getItem('irrigationMethod') as any) || 'manual'
+  const [activeNutrientLine, setActiveNutrientLineState] =
+    useState<NutrientLine>(readNutrientLine);
+  const [irrigationMethod, setIrrigationMethodState] =
+    useState<IrrigationMethod>(readIrrigationMethod);
+
+  // Espejos del estado para que las acciones puedan leer valores actuales sin
+  // recrearse en cada render (y sin capturar closures viejos).
+  const stateRef = useRef({ lots, tasks, strains, logs, activeNutrientLine });
+  useEffect(() => {
+    stateRef.current = { lots, tasks, strains, logs, activeNutrientLine };
+  }, [lots, tasks, strains, logs, activeNutrientLine]);
+
+  // ─── Manejo de errores ──────────────────────────────────────────────────────
+
+  const logAppError = useCallback((context: string, error: unknown) => {
+    console.error(`[${context}]`, error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error)
+          : String(error);
+
+    setAppErrors(prev =>
+      [
+        {
+          id: `err_${crypto.randomUUID()}`,
+          timestamp: new Date().toISOString(),
+          context,
+          message,
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+        ...prev,
+      ].slice(0, 50)
+    );
+    return message;
+  }, []);
+
+  /**
+   * Ejecuta una operación contra Supabase informando el resultado al usuario.
+   * Devuelve `true` si salió bien. Antes los errores se tragaban en silencio y
+   * la interfaz simulaba éxito.
+   */
+  const run = useCallback(
+    async (context: string, operation: () => Promise<void>): Promise<boolean> => {
+      try {
+        await operation();
+        return true;
+      } catch (error) {
+        const message = logAppError(context, error);
+        toast.error(`No se pudo completar: ${context.toLowerCase()}`, message);
+        return false;
+      }
+    },
+    [logAppError, toast]
   );
 
-  const logAppError = (context: string, error: any) => {
-    console.error(`[Error Context: ${context}]`, error);
-    const newError = {
-      id: 'err_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
-      timestamp: new Date().toISOString(),
-      context,
-      message: error instanceof Error ? error.message : (error && typeof error === 'object' ? JSON.stringify(error) : String(error)),
-      stack: error instanceof Error ? error.stack : undefined
+  const clearAppErrors = useCallback(() => setAppErrors([]), []);
+
+  // ─── Carga inicial ──────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      if (!isSupabaseConfigured) {
+        setDbStatus('config_error');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const data = await api.fetchInitialData();
+        if (cancelled) return;
+        setStrains(data.strains);
+        setLots(data.lots);
+        setLogs(data.logs);
+        setTasks(data.tasks);
+        setHelpers(data.helpers);
+        setHasMoreLogs(data.hasMoreLogs);
+        setDbStatus('connected');
+      } catch (error) {
+        if (cancelled) return;
+        logAppError('Cargar datos de Supabase', error);
+        const message = error instanceof Error ? error.message : '';
+        setDbStatus(
+          message.includes('JWT') || message.includes('auth') ? 'auth_error' : 'disconnected'
+        );
+        toast.error('No se pudieron cargar los datos', message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
-    setAppErrors(prev => [newError, ...prev].slice(0, 50));
-  };
 
-  const clearAppErrors = () => {
-    setAppErrors([]);
-  };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+    // Sólo debe correr al montar; `toast` y `logAppError` son estables.
+  }, [logAppError, toast]);
 
-  const generateSafeId = (prefix: string): string => {
-    const randomPart = Math.random().toString(36).substring(2, 9);
-    const timePart = Date.now();
-    return `${prefix}_${randomPart}_${timePart}`;
-  };
-
-  const checkDbConnection = async () => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-    if (!supabaseUrl || !supabaseAnonKey) {
+  const checkDbConnection = useCallback(async () => {
+    if (!isSupabaseConfigured) {
       setDbStatus('config_error');
       return;
     }
     try {
-      const startTime = Date.now();
-      const { error } = await supabase.from('strains').select('id').limit(1);
-      if (error) {
-        if (error.code === 'PGRST111' || error.message?.includes('JWT') || error.message?.includes('auth')) {
-          setDbStatus('auth_error');
-        } else {
-          setDbStatus('disconnected');
-        }
-        logAppError('Probar Conexión Supabase', error);
-      } else {
-        setDbLatency(Date.now() - startTime);
-        setDbStatus('connected');
-      }
-    } catch (err) {
-      setDbStatus('disconnected');
-      logAppError('Probar Conexión Supabase', err);
+      const { latencyMs } = await api.pingDatabase();
+      setDbLatency(latencyMs);
+      setDbStatus('connected');
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      const message = error instanceof Error ? error.message : '';
+      setDbStatus(
+        code === 'PGRST111' || message.includes('JWT') || message.includes('auth')
+          ? 'auth_error'
+          : 'disconnected'
+      );
+      logAppError('Probar conexión Supabase', error);
     }
-  };
+  }, [logAppError]);
 
-  const cleanOrphanedRecords = async () => {
-    try {
-      const lotIds = new Set(lots.map(l => l.id));
-      const orphanedLogs = logs.filter(log => !lotIds.has(log.lot_id));
-      const orphanedTasks = tasks.filter(task => !lotIds.has(task.lot_id));
+  // ─── Cronogramas automáticos ────────────────────────────────────────────────
 
-      if (orphanedLogs.length > 0) {
-        const { error } = await supabase
-          .from('logs')
-          .delete()
-          .in('id', orphanedLogs.map(l => l.id));
-        if (error) throw error;
-        setLogs(prev => prev.filter(log => lotIds.has(log.lot_id)));
-      }
+  const generateScheduleTasks = useCallback(
+    async (lot: Pick<Lot, 'id' | 'stage' | 'start_date'>, line: NutrientLine) => {
+      const schedule = getSchedule(lot.stage, line);
+      const stageLabel = lot.stage === 'Vegetativo' ? 'veg' : 'flo';
 
-      if (orphanedTasks.length > 0) {
-        const { error } = await supabase
-          .from('tasks')
-          .delete()
-          .in('id', orphanedTasks.map(t => t.id));
-        if (error) throw error;
-        setTasks(prev => prev.filter(task => lotIds.has(task.lot_id)));
-      }
-
-      return {
-        orphanedLogsCount: orphanedLogs.length,
-        orphanedTasksCount: orphanedTasks.length
-      };
-    } catch (err) {
-      logAppError('Limpiar Registros Huérfanos', err);
-      throw err;
-    }
-  };
-
-  const loadSeedsToSupabase = async () => {
-    const seeds = getSeeds();
-    try {
-      const { error: e1 } = await supabase.from('strains').insert(seeds.initialStrains);
-      if (e1) throw e1;
-      const { error: e2 } = await supabase.from('lots').insert(seeds.initialLots);
-      if (e2) throw e2;
-      const { error: e3 } = await supabase.from('logs').insert(seeds.initialLogs);
-      if (e3) throw e3;
-      const { error: e4 } = await supabase.from('tasks').insert(seeds.initialTasks);
-      if (e4) throw e4;
-
-      setStrains(seeds.initialStrains);
-      setLots(seeds.initialLots);
-      setLogs(seeds.initialLogs);
-      setTasks(seeds.initialTasks);
-    } catch (err) {
-      logAppError("Cargar semillas en Supabase", err);
-    }
-  };
-
-  // Cargar datos de Supabase al iniciar
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        // Ejecutar todas las queries en paralelo (sin checkDbConnection redundante)
-        const [strainsRes, lotsRes, logsRes, tasksRes, helpersRes] = await Promise.all([
-          supabase.from('strains').select('*'),
-          supabase.from('lots').select('*'),
-          supabase.from('logs').select('*').order('date', { ascending: false }),
-          supabase.from('tasks').select('*').order('date', { ascending: true }),
-          supabase.from('helpers').select('*')
-        ]);
-
-        if (strainsRes.error) throw strainsRes.error;
-        if (lotsRes.error) throw lotsRes.error;
-        if (logsRes.error) throw logsRes.error;
-        if (tasksRes.error) throw tasksRes.error;
-        if (helpersRes.error) throw helpersRes.error;
-
-        setStrains(strainsRes.data || []);
-        setLots(lotsRes.data || []);
-        setLogs(logsRes.data || []);
-        setTasks(tasksRes.data || []);
-        setHelpers(helpersRes.data || []);
-        // Actualizar estado de conexión con latencia real
-        setDbStatus('connected');
-      } catch (err: any) {
-        logAppError("Cargando datos de Supabase", err);
-        if (err?.code === 'PGRST111' || err?.message?.includes('JWT') || err?.message?.includes('auth')) {
-          setDbStatus('auth_error');
-        } else {
-          setDbStatus('disconnected');
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  // Generador de tareas automático con preservación de estado
-  const generateScheduleTasks = async (
-    lotId: string, 
-    stage: string, 
-    startDateStr: string,
-    overrideLine?: 'ryanodine' | 'athena_pro' | 'athena_blended'
-  ) => {
-    try {
-      const currentLine = overrideLine || activeNutrientLine;
-
-      // 1. Obtener tareas autogeneradas actuales para ver cuáles están completadas
-      const { data: oldTasks } = await supabase
-        .from('tasks')
-        .select('id, is_completed')
-        .like('id', `task_sched_${lotId}_%`);
-      
-      const completedWeeks = new Set<string>();
-      if (oldTasks) {
-        oldTasks.forEach(ot => {
-          if (ot.is_completed) {
-            const match = ot.id.match(/_w(\d+)_/);
-            if (match) completedWeeks.add(match[1]);
-          }
-        });
-      }
-
-      // 2. Eliminar tareas previas autogeneradas para este lote
-      const { error: deleteError } = await supabase
-        .from('tasks')
-        .delete()
-        .like('id', `task_sched_${lotId}_%`);
-      
-      if (deleteError) throw deleteError;
-
-      // 3. Elegir el conjunto de semanas del cronograma según la etapa
-      let scheduleWeeks: any[] = [];
-      let label = '';
-      if (stage === 'Vegetativo') {
-        label = 'veg';
-        if (currentLine === 'athena_pro') {
-          scheduleWeeks = ATHENA_PRO_VEG_SCHEDULE;
-        } else if (currentLine === 'athena_blended') {
-          scheduleWeeks = ATHENA_BLENDED_VEG_SCHEDULE;
-        } else {
-          scheduleWeeks = VEG_SCHEDULE;
-        }
-      } else if (stage === 'Floración') {
-        label = 'flo';
-        if (currentLine === 'athena_pro') {
-          scheduleWeeks = ATHENA_PRO_FLOWER_SCHEDULE;
-        } else if (currentLine === 'athena_blended') {
-          scheduleWeeks = ATHENA_BLENDED_FLOWER_SCHEDULE;
-        } else {
-          scheduleWeeks = FLOWER_SCHEDULE;
-        }
-      } else {
-        // Para Germinación, Secado, Curado, etc. no autogeneramos cronograma de fertilizantes
-        setTasks(prev => prev.filter(t => !t.id.startsWith(`task_sched_${lotId}_`)));
+      // Germinación, secado y curado no llevan cronograma de fertilizantes.
+      if (schedule.length === 0) {
+        await api.replaceScheduleTasks(lot.id, []);
+        setTasks(prev =>
+          prev.filter(t => !t.id.startsWith(api.scheduleTaskPrefix(lot.id)))
+        );
         return;
       }
 
-      // 4. Generar tareas (una por semana) preservando is_completed
-      const start = new Date(startDateStr + 'T00:00:00');
-      const tasksToInsert: Task[] = scheduleWeeks.map((s, idx) => {
-        const taskDate = new Date(start.getTime() + (idx * 7 * 24 * 60 * 60 * 1000));
-        const isCompleted = completedWeeks.has(s.week.toString());
-        
-        let dosisText = '';
-        if (currentLine === 'athena_pro') {
-          const isFade = s.week === 8;
-          dosisText = `Pro Bloom: ${s.makroA} g/10L, ${isFade ? 'Fade' : 'Pro Core'}: ${s.mikroB} ${isFade ? 'mL' : 'g'}/10L, Cleanse: ${s.calcisC} mL/10L`;
-        } else if (currentLine === 'athena_blended') {
-          const suffixDose = s.title.toLowerCase().includes('veg') ? 'Grow A & B' : 'Bloom A & B';
-          dosisText = `${suffixDose}: ${s.makroA} mL/10L, CaMg / PK: ${s.calcisC} mL/10L, Cleanse: 0.8 mL/L`;
-        } else {
-          dosisText = `A: ${s.makroA} ml/L, B: ${s.mikroB} ml/L, C: ${s.calcisC} ml/L`;
-        }
+      // Preservar qué semanas ya estaban marcadas como completadas.
+      const completedWeeks = await api.fetchCompletedScheduleWeeks(lot.id);
 
-        return {
-          id: `task_sched_${lotId}_${label}_w${s.week}_${idx}`,
-          lot_id: lotId,
-          title: `${s.title}`,
-          date: taskDate.toISOString().split('T')[0],
-          type: 'fertilizante',
-          notes: `pH: ${s.ph} | EC: ${s.ec} mS/cm. Dosis: ${dosisText}. ${s.notes}`,
-          is_completed: isCompleted
-        };
-      });
+      const newTasks: Task[] = schedule.map((week, index) => ({
+        id: `${api.scheduleTaskPrefix(lot.id)}${stageLabel}_w${week.week}_${index}`,
+        lot_id: lot.id,
+        title: week.title,
+        date: addDaysToStr(lot.start_date, index * 7),
+        type: 'fertilizante',
+        notes: `pH: ${week.ph} | EC: ${week.ec} mS/cm. Dosis: ${formatDose(week, line)}. ${week.notes}`,
+        is_completed: completedWeeks.has(String(week.week)),
+      }));
 
-      if (tasksToInsert.length > 0) {
-        const { error: insertError } = await supabase.from('tasks').insert(tasksToInsert);
-        if (insertError) throw insertError;
+      await api.replaceScheduleTasks(lot.id, newTasks);
+      setTasks(prev => [
+        ...prev.filter(t => !t.id.startsWith(api.scheduleTaskPrefix(lot.id))),
+        ...newTasks,
+      ]);
+    },
+    []
+  );
+
+  // ─── Genéticas ──────────────────────────────────────────────────────────────
+
+  const addStrain = useCallback(
+    async (strain: Omit<Strain, 'id'>) => {
+      const newStrain: Strain = { ...strain, id: api.generateId('strain') };
+      const ok = await run('Agregar genética', () => api.insertStrain(newStrain));
+      if (ok) setStrains(prev => [...prev, newStrain]);
+    },
+    [run]
+  );
+
+  const deleteStrain = useCallback(
+    async (id: string) => {
+      const strain = stateRef.current.strains.find(s => s.id === id);
+      const usedBy = strain
+        ? stateRef.current.lots.filter(
+            l => !l.is_archived && l.strain.toLowerCase() === strain.name.toLowerCase()
+          )
+        : [];
+
+      const ok = await run('Borrar genética', () => api.deleteStrain(id));
+      if (!ok) return;
+
+      setStrains(prev => prev.filter(s => s.id !== id));
+      if (usedBy.length > 0) {
+        toast.warning(
+          'Genética eliminada del catálogo',
+          `${usedBy.length} lote(s) activo(s) siguen usando "${strain?.name}". El nombre queda en esos lotes pero ya no está en el catálogo.`
+        );
       }
+    },
+    [run, toast]
+  );
 
-      // Actualizar estado local
-      setTasks(prev => {
-        const filtered = prev.filter(t => !t.id.startsWith(`task_sched_${lotId}_`));
-        return [...filtered, ...tasksToInsert];
+  /** Registra una genética nueva en el catálogo si el lote usa una desconocida. */
+  const ensureStrainExists = useCallback(
+    async (strainName: string) => {
+      const name = strainName.trim();
+      if (!name) return;
+      const exists = stateRef.current.strains.some(
+        s => s.name.toLowerCase() === name.toLowerCase()
+      );
+      if (!exists) await addStrain({ name, type: 'Híbrido' });
+    },
+    [addStrain]
+  );
+
+  // ─── Lotes ──────────────────────────────────────────────────────────────────
+
+  const addLot = useCallback(
+    async (lot: Omit<Lot, 'id' | 'is_archived'>) => {
+      const newLot: Lot = { ...lot, id: api.generateId('lot'), is_archived: false };
+
+      const ok = await run('Agregar lote', () => api.insertLot(newLot));
+      if (!ok) return;
+
+      setLots(prev => [...prev, newLot]);
+      await ensureStrainExists(newLot.strain);
+      await run('Generar cronograma', () =>
+        generateScheduleTasks(newLot, stateRef.current.activeNutrientLine)
+      );
+      toast.success('Lote creado', newLot.name);
+    },
+    [run, ensureStrainExists, generateScheduleTasks, toast]
+  );
+
+  const editLot = useCallback(
+    async (lot: Lot) => {
+      const previous = stateRef.current.lots.find(l => l.id === lot.id);
+
+      const ok = await run('Editar lote', () => api.updateLot(lot));
+      if (!ok) return;
+
+      setLots(prev => prev.map(l => (l.id === lot.id ? lot : l)));
+      await ensureStrainExists(lot.strain);
+
+      // Regenerar el cronograma SÓLO si cambió algo que lo afecta. Antes se
+      // borraba y reinsertaba siempre, perdiendo las notas editadas a mano.
+      const scheduleChanged =
+        !previous ||
+        previous.stage !== lot.stage ||
+        previous.start_date !== lot.start_date;
+
+      if (scheduleChanged) {
+        await run('Regenerar cronograma', () =>
+          generateScheduleTasks(lot, stateRef.current.activeNutrientLine)
+        );
+      }
+      toast.success('Lote actualizado', lot.name);
+    },
+    [run, ensureStrainExists, generateScheduleTasks, toast]
+  );
+
+  const archiveLot = useCallback(
+    async (id: string) => {
+      const ok = await run('Archivar lote', () => api.setLotArchived(id, true));
+      if (ok) setLots(prev => prev.map(l => (l.id === id ? { ...l, is_archived: true } : l)));
+    },
+    [run]
+  );
+
+  const unarchiveLot = useCallback(
+    async (id: string) => {
+      const ok = await run('Reactivar lote', () => api.setLotArchived(id, false));
+      if (ok) setLots(prev => prev.map(l => (l.id === id ? { ...l, is_archived: false } : l)));
+    },
+    [run]
+  );
+
+  // ─── Registros diarios ──────────────────────────────────────────────────────
+
+  const addLog = useCallback(
+    async (log: Omit<Log, 'id' | 'date' | 'vpd'>) => {
+      const newLog: Log = {
+        ...log,
+        id: api.generateId('log'),
+        date: new Date().toISOString(),
+        vpd: calculateVPD(log.temp, log.humidity),
+      };
+      const ok = await run('Agregar registro diario', () => api.insertLog(newLog));
+      if (ok) setLogs(prev => [newLog, ...prev]);
+    },
+    [run]
+  );
+
+  const deleteLog = useCallback(
+    async (id: string) => {
+      const ok = await run('Borrar registro diario', () => api.deleteLog(id));
+      if (ok) setLogs(prev => prev.filter(l => l.id !== id));
+    },
+    [run]
+  );
+
+  const loadMoreLogs = useCallback(async () => {
+    setLoadingMoreLogs(true);
+    try {
+      const { logs: nextLogs, hasMore } = await api.fetchLogsPage(
+        stateRef.current.logs.length
+      );
+      // Deduplicar por si entró un registro nuevo mientras se paginaba.
+      setLogs(prev => {
+        const seen = new Set(prev.map(l => l.id));
+        return [...prev, ...nextLogs.filter(l => !seen.has(l.id))];
       });
-    } catch (err) {
-      logAppError("Generar Cronograma de Tareas", err);
+      setHasMoreLogs(hasMore);
+    } catch (error) {
+      const message = logAppError('Cargar más registros', error);
+      toast.error('No se pudieron cargar más registros', message);
+    } finally {
+      setLoadingMoreLogs(false);
     }
-  };
+  }, [logAppError, toast]);
 
-  const setActiveNutrientLine = async (line: 'ryanodine' | 'athena_pro' | 'athena_blended') => {
-    setActiveNutrientLineState(line);
-    localStorage.setItem('activeNutrientLine', line);
-    // Regenerar las tareas de todos los lotes no archivados
-    // Usamos el estado actual de lots de forma directa para evitar closure stale
-    setLots(currentLots => {
-      const activeLots = currentLots.filter(l => !l.is_archived);
-      // Disparar las regeneraciones en background (sin bloquear el setter)
-      Promise.all(
-        activeLots.map(lot => generateScheduleTasks(lot.id, lot.stage, lot.start_date, line))
-      ).catch(err => logAppError('Regenerar Cronogramas por Línea de Nutrientes', err));
-      return currentLots; // No modificamos lots aquí, solo leemos
-    });
-  };
+  // ─── Tareas ─────────────────────────────────────────────────────────────────
 
-  const setIrrigationMethod = (method: 'manual' | 'automated') => {
+  const addTask = useCallback(
+    async (task: Omit<Task, 'id' | 'is_completed'>) => {
+      const newTask: Task = { ...task, id: api.generateId('task'), is_completed: false };
+      const ok = await run('Agregar tarea', () => api.insertTask(newTask));
+      if (ok) setTasks(prev => [...prev, newTask]);
+    },
+    [run]
+  );
+
+  const toggleTask = useCallback(
+    async (id: string) => {
+      const task = stateRef.current.tasks.find(t => t.id === id);
+      if (!task) return;
+
+      const nextCompleted = !task.is_completed;
+      // Actualización optimista: el checkbox responde al instante.
+      setTasks(prev =>
+        prev.map(t => (t.id === id ? { ...t, is_completed: nextCompleted } : t))
+      );
+
+      const ok = await run('Actualizar tarea', () => api.setTaskCompleted(id, nextCompleted));
+      if (!ok) {
+        setTasks(prev =>
+          prev.map(t => (t.id === id ? { ...t, is_completed: task.is_completed } : t))
+        );
+      }
+    },
+    [run]
+  );
+
+  const deleteTask = useCallback(
+    async (id: string) => {
+      const ok = await run('Borrar tarea', () => api.deleteTask(id));
+      if (ok) setTasks(prev => prev.filter(t => t.id !== id));
+    },
+    [run]
+  );
+
+  // ─── Ayudantes ──────────────────────────────────────────────────────────────
+
+  const addHelper = useCallback(
+    async (name: string) => {
+      const newHelper: Helper = { id: api.generateId('helper'), name };
+      const ok = await run('Agregar ayudante', () => api.insertHelper(newHelper));
+      if (ok) setHelpers(prev => [...prev, newHelper]);
+    },
+    [run]
+  );
+
+  const deleteHelper = useCallback(
+    async (id: string) => {
+      const ok = await run('Borrar ayudante', () => api.deleteHelper(id));
+      if (ok) setHelpers(prev => prev.filter(h => h.id !== id));
+    },
+    [run]
+  );
+
+  // ─── Fotos ──────────────────────────────────────────────────────────────────
+
+  const uploadPhoto = useCallback(
+    async (file: File): Promise<string | null> => {
+      try {
+        return await api.uploadPhoto(file);
+      } catch (error) {
+        const message = logAppError('Subir foto', error);
+        toast.error('No se pudo subir la foto', message);
+        return null;
+      }
+    },
+    [logAppError, toast]
+  );
+
+  // ─── Configuración ──────────────────────────────────────────────────────────
+
+  const setActiveNutrientLine = useCallback(
+    async (line: NutrientLine) => {
+      setActiveNutrientLineState(line);
+      localStorage.setItem('activeNutrientLine', line);
+      stateRef.current.activeNutrientLine = line;
+
+      // Regenerar los cronogramas de los lotes activos con recetas.
+      // Antes esto vivía dentro de un `setLots(current => ...)`, lo que bajo
+      // StrictMode disparaba la regeneración dos veces.
+      const activeLots = stateRef.current.lots.filter(
+        l => !l.is_archived && getSchedule(l.stage, line).length > 0
+      );
+
+      const ok = await run('Regenerar cronogramas', async () => {
+        for (const lot of activeLots) {
+          await generateScheduleTasks(lot, line);
+        }
+      });
+      if (ok && activeLots.length > 0) {
+        toast.success(
+          'Cronogramas actualizados',
+          `Se regeneraron las recetas de ${activeLots.length} lote(s).`
+        );
+      }
+    },
+    [run, generateScheduleTasks, toast]
+  );
+
+  const setIrrigationMethod = useCallback((method: IrrigationMethod) => {
     setIrrigationMethodState(method);
     localStorage.setItem('irrigationMethod', method);
-  };
+  }, []);
 
-  const addLot = async (lot: Omit<Lot, 'id' | 'is_archived'>) => {
-    const newLot: Lot = {
-      ...lot,
-      id: generateSafeId('lot'),
-      is_archived: false
-    };
+  // ─── Mantenimiento ──────────────────────────────────────────────────────────
+
+  const cleanOrphanedRecords = useCallback(async () => {
+    const lotIds = new Set(stateRef.current.lots.map(l => l.id));
+    const orphanedLogs = stateRef.current.logs.filter(l => !lotIds.has(l.lot_id));
+    const orphanedTasks = stateRef.current.tasks.filter(t => !lotIds.has(t.lot_id));
+
     try {
-      const { error } = await supabase.from('lots').insert(newLot);
-      if (error) throw error;
-      setLots(prev => [...prev, newLot]);
-
-      // Registrar strain automáticamente si no existe en el catálogo
-      const strainExists = strains.some(s => s.name.toLowerCase() === lot.strain.toLowerCase());
-      if (!strainExists && lot.strain.trim()) {
-        await addStrain({ name: lot.strain.trim(), type: 'Híbrido' });
-      }
-
-      // Generar tareas semanales
-      await generateScheduleTasks(newLot.id, newLot.stage, newLot.start_date);
-    } catch (err) {
-      logAppError("Agregar Lote", err);
+      const result = await api.deleteOrphans(
+        orphanedLogs.map(l => l.id),
+        orphanedTasks.map(t => t.id)
+      );
+      setLogs(prev => prev.filter(l => lotIds.has(l.lot_id)));
+      setTasks(prev => prev.filter(t => lotIds.has(t.lot_id)));
+      return result;
+    } catch (error) {
+      const message = logAppError('Limpiar registros huérfanos', error);
+      toast.error('No se pudo limpiar', message);
+      throw error;
     }
-  };
+  }, [logAppError, toast]);
 
-  const editLot = async (lot: Lot) => {
-    try {
-      const { error } = await supabase.from('lots').update(lot).eq('id', lot.id);
-      if (error) throw error;
-      setLots(prev => prev.map(l => l.id === lot.id ? lot : l));
+  const clearDatabase = useCallback(async () => {
+    const ok = await run('Vaciar base de datos', () => api.clearAllData());
+    if (!ok) return;
+    setStrains([]);
+    setLots([]);
+    setLogs([]);
+    setTasks([]);
+    setHelpers([]);
+    setHasMoreLogs(false);
+    toast.success('Base de datos vaciada');
+  }, [run, toast]);
 
-      // Registrar strain automáticamente si no existe en el catálogo
-      const strainExists = strains.some(s => s.name.toLowerCase() === lot.strain.toLowerCase());
-      if (!strainExists && lot.strain.trim()) {
-        await addStrain({ name: lot.strain.trim(), type: 'Híbrido' });
-      }
+  const loadDemoData = useCallback(async () => {
+    const seeds = buildSeedData();
+    const ok = await run('Cargar datos de demostración', () =>
+      api.importBackup({ ...seeds, helpers: [] }).then(() => undefined)
+    );
+    if (!ok) return;
+    setStrains(seeds.strains);
+    setLots(seeds.lots);
+    setLogs(seeds.logs);
+    setTasks(seeds.tasks);
+    setHelpers([]);
+    toast.success('Datos de demostración cargados');
+  }, [run, toast]);
 
-      // Regenerar tareas si cambian fecha o fase
-      await generateScheduleTasks(lot.id, lot.stage, lot.start_date);
-    } catch (err) {
-      logAppError("Editar Lote", err);
-    }
-  };
-
-  const archiveLot = async (id: string) => {
-    try {
-      const { error } = await supabase.from('lots').update({ is_archived: true }).eq('id', id);
-      if (error) throw error;
-      setLots(prev => prev.map(l => l.id === id ? { ...l, is_archived: true } : l));
-    } catch (err) {
-      logAppError("Archivar Lote", err);
-    }
-  };
-
-  const unarchiveLot = async (id: string) => {
-    try {
-      const { error } = await supabase.from('lots').update({ is_archived: false }).eq('id', id);
-      if (error) throw error;
-      setLots(prev => prev.map(l => l.id === id ? { ...l, is_archived: false } : l));
-    } catch (err) {
-      logAppError("Reactivar Lote", err);
-    }
-  };
-
-  const addStrain = async (strain: Omit<Strain, 'id'>) => {
-    const newStrain: Strain = {
-      ...strain,
-      id: generateSafeId('strain')
-    };
-    try {
-      const { error } = await supabase.from('strains').insert(newStrain);
-      if (error) throw error;
-      setStrains(prev => [...prev, newStrain]);
-    } catch (err) {
-      logAppError("Agregar Genética", err);
-    }
-  };
-
-  const deleteStrain = async (id: string) => {
-    try {
-      const { error } = await supabase.from('strains').delete().eq('id', id);
-      if (error) throw error;
-      setStrains(prev => prev.filter(s => s.id !== id));
-    } catch (err) {
-      logAppError("Borrar Genética", err);
-    }
-  };
-
-  const addLog = async (log: Omit<Log, 'id' | 'date' | 'vpd'>) => {
-    const vpd = calculateVPD(log.temp, log.humidity);
-    const newLog: Log = {
-      ...log,
-      id: generateSafeId('log'),
-      date: new Date().toISOString(),
-      vpd
-    };
-    try {
-      const { error } = await supabase.from('logs').insert(newLog);
-      if (error) throw error;
-      setLogs(prev => [newLog, ...prev]);
-    } catch (err) {
-      logAppError("Agregar Registro Diario", err);
-    }
-  };
-
-  const deleteLog = async (id: string) => {
-    try {
-      const { error } = await supabase.from('logs').delete().eq('id', id);
-      if (error) throw error;
-      setLogs(prev => prev.filter(l => l.id !== id));
-    } catch (err) {
-      logAppError("Borrar Registro Diario", err);
-    }
-  };
-
-  const addTask = async (task: Omit<Task, 'id' | 'is_completed'>) => {
-    const newTask: Task = {
-      ...task,
-      id: generateSafeId('task'),
-      is_completed: false
-    };
-    try {
-      const { error } = await supabase.from('tasks').insert(newTask);
-      if (error) throw error;
-      setTasks(prev => [...prev, newTask]);
-    } catch (err) {
-      logAppError("Agregar Tarea", err);
-    }
-  };
-
-  const toggleTask = async (id: string) => {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    const updatedTask = { ...task, is_completed: !task.is_completed };
-    try {
-      const { error } = await supabase.from('tasks').update({ is_completed: updatedTask.is_completed }).eq('id', id);
-      if (error) throw error;
-      setTasks(prev => prev.map(t => t.id === id ? updatedTask : t));
-    } catch (err) {
-      logAppError("Actualizar Estado de Tarea", err);
-    }
-  };
-
-  const deleteTask = async (id: string) => {
-    try {
-      const { error } = await supabase.from('tasks').delete().eq('id', id);
-      if (error) throw error;
-      setTasks(prev => prev.filter(t => t.id !== id));
-    } catch (err) {
-      logAppError("Borrar Tarea", err);
-    }
-  };
-
-  const addHelper = async (name: string) => {
-    const newHelper: Helper = {
-      id: generateSafeId('helper'),
-      name
-    };
-    try {
-      const { error } = await supabase.from('helpers').insert(newHelper);
-      if (error) throw error;
-      setHelpers(prev => [...prev, newHelper]);
-    } catch (err) {
-      logAppError("Agregar Ayudante", err);
-    }
-  };
-
-  const deleteHelper = async (id: string) => {
-    try {
-      const { error } = await supabase.from('helpers').delete().eq('id', id);
-      if (error) throw error;
-      setHelpers(prev => prev.filter(h => h.id !== id));
-    } catch (err) {
-      logAppError("Borrar Ayudante", err);
-    }
-  };
-
-  const uploadPhoto = async (file: File): Promise<string | null> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      const filePath = fileName;
-
-      const { error: uploadError } = await supabase.storage
-        .from('grow-photos')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('grow-photos')
-        .getPublicUrl(filePath);
-
-      return publicUrl;
-    } catch (err) {
-      logAppError("Subir Foto a Supabase Storage", err);
-      return null;
-    }
-  };
-
-  const clearDatabase = async () => {
-    try {
-      await Promise.all([
-        supabase.from('strains').delete().neq('id', 'keep_none'),
-        supabase.from('lots').delete().neq('id', 'keep_none'),
-        supabase.from('logs').delete().neq('id', 'keep_none'),
-        supabase.from('tasks').delete().neq('id', 'keep_none'),
-        supabase.from('helpers').delete().neq('id', 'keep_none')
-      ]);
-      setStrains([]);
-      setLots([]);
-      setLogs([]);
-      setTasks([]);
-      setHelpers([]);
-    } catch (err) {
-      logAppError("Vaciar Base de Datos", err);
-    }
-  };
-
-  const loadDemoData = async () => {
-    try {
+  const importDatabase = useCallback(
+    async (data: BackupFile) => {
       setLoading(true);
-      await loadSeedsToSupabase();
-    } catch (err) {
-      logAppError("Cargar Datos de Demostración", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const imported = await api.importBackup(data);
+        setStrains(imported.strains);
+        setLots(imported.lots);
+        setLogs(imported.logs);
+        setTasks(imported.tasks);
+        setHelpers(imported.helpers ?? []);
+        setHasMoreLogs(false);
+        toast.success('Importación completada');
+      } catch (error) {
+        const message = logAppError('Importar base de datos', error);
+        toast.error('Falló la importación', message);
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [logAppError, toast]
+  );
 
-  const importDatabase = async (data: any) => {
-    try {
-      setLoading(true);
-      await clearDatabase();
+  // ─── Valores de contexto ────────────────────────────────────────────────────
 
-      const { data: { user } } = await supabase.auth.getUser();
-      const currentUserId = user?.id;
+  const lotsById = useMemo(() => new Map(lots.map(lot => [lot.id, lot])), [lots]);
+  const activeLots = useMemo(() => lots.filter(l => !l.is_archived), [lots]);
 
-      const sanitizeData = (list: any[]) => {
-        return list.map(item => {
-          const { user_id, ...rest } = item;
-          return {
-            ...rest,
-            ...(currentUserId ? { user_id: currentUserId } : {})
-          };
-        });
-      };
+  const data = useMemo<GrowData>(
+    () => ({
+      strains,
+      lots,
+      logs,
+      tasks,
+      helpers,
+      lotsById,
+      activeLots,
+      activeNutrientLine,
+      irrigationMethod,
+      appErrors,
+      dbStatus,
+      dbLatency,
+      hasMoreLogs,
+      loadingMoreLogs,
+    }),
+    [
+      strains,
+      lots,
+      logs,
+      tasks,
+      helpers,
+      lotsById,
+      activeLots,
+      activeNutrientLine,
+      irrigationMethod,
+      appErrors,
+      dbStatus,
+      dbLatency,
+      hasMoreLogs,
+      loadingMoreLogs,
+    ]
+  );
 
-      if (data.strains && data.strains.length > 0) {
-        const sanitized = sanitizeData(data.strains);
-        const { error } = await supabase.from('strains').insert(sanitized);
-        if (error) throw error;
-        setStrains(sanitized);
-      }
-      if (data.lots && data.lots.length > 0) {
-        const sanitized = sanitizeData(data.lots);
-        const { error } = await supabase.from('lots').insert(sanitized);
-        if (error) throw error;
-        setLots(sanitized);
-      }
-      if (data.logs && data.logs.length > 0) {
-        const sanitized = sanitizeData(data.logs);
-        const { error } = await supabase.from('logs').insert(sanitized);
-        if (error) throw error;
-        setLogs(sanitized);
-      }
-      if (data.tasks && data.tasks.length > 0) {
-        const sanitized = sanitizeData(data.tasks);
-        const { error } = await supabase.from('tasks').insert(sanitized);
-        if (error) throw error;
-        setTasks(sanitized);
-      }
-      if (data.helpers && data.helpers.length > 0) {
-        const sanitized = sanitizeData(data.helpers);
-        const { error } = await supabase.from('helpers').insert(sanitized);
-        if (error) throw error;
-        setHelpers(sanitized);
-      }
-    } catch (err) {
-      logAppError("Importar Base de Datos", err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const actions = useMemo<GrowActions>(
+    () => ({
+      addLot,
+      editLot,
+      archiveLot,
+      unarchiveLot,
+      addLog,
+      deleteLog,
+      loadMoreLogs,
+      addTask,
+      toggleTask,
+      deleteTask,
+      addStrain,
+      deleteStrain,
+      addHelper,
+      deleteHelper,
+      uploadPhoto,
+      clearDatabase,
+      loadDemoData,
+      importDatabase,
+      setActiveNutrientLine,
+      setIrrigationMethod,
+      clearAppErrors,
+      checkDbConnection,
+      cleanOrphanedRecords,
+    }),
+    [
+      addLot,
+      editLot,
+      archiveLot,
+      unarchiveLot,
+      addLog,
+      deleteLog,
+      loadMoreLogs,
+      addTask,
+      toggleTask,
+      deleteTask,
+      addStrain,
+      deleteStrain,
+      addHelper,
+      deleteHelper,
+      uploadPhoto,
+      clearDatabase,
+      loadDemoData,
+      importDatabase,
+      setActiveNutrientLine,
+      setIrrigationMethod,
+      clearAppErrors,
+      checkDbConnection,
+      cleanOrphanedRecords,
+    ]
+  );
 
   return (
-    <GrowContext.Provider value={{
-      strains, lots, logs, tasks, helpers,
-      addLot, editLot, archiveLot, unarchiveLot,
-      addLog, deleteLog, addTask, toggleTask, deleteTask,
-      addStrain, deleteStrain, addHelper, deleteHelper, uploadPhoto, clearDatabase, loadDemoData,
-      importDatabase,
-      activeNutrientLine, setActiveNutrientLine,
-      irrigationMethod, setIrrigationMethod,
-      appErrors, clearAppErrors,
-      dbStatus, dbLatency, checkDbConnection, cleanOrphanedRecords
-    }}>
-      {loading ? (
-        <div className="flex min-h-screen bg-slate-50 text-slate-800 items-center justify-center font-sans">
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-slate-500 text-sm animate-pulse font-medium">Conectando con Supabase...</p>
-          </div>
-        </div>
-      ) : children}
-    </GrowContext.Provider>
+    <GrowActionsContext.Provider value={actions}>
+      <GrowDataContext.Provider value={data}>
+        {loading ? <LoadingScreen /> : children}
+      </GrowDataContext.Provider>
+    </GrowActionsContext.Provider>
   );
 };
 
-export const useGrow = () => {
-  const context = useContext(GrowContext);
-  if (!context) throw new Error('useGrow debe ser usado dentro de un GrowProvider');
+const LoadingScreen = () => (
+  <div className="flex min-h-screen bg-slate-50 text-slate-800 items-center justify-center font-sans">
+    <div className="text-center space-y-4">
+      <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+      <p className="text-slate-500 text-sm animate-pulse font-medium">
+        Conectando con Supabase...
+      </p>
+    </div>
+  </div>
+);
+
+// ─── Hooks ────────────────────────────────────────────────────────────────────
+
+/** Estado del cultivo. Se vuelve a renderizar cuando cambian los datos. */
+export const useGrow = (): GrowData => {
+  const context = useContext(GrowDataContext);
+  if (!context) throw new Error('useGrow debe usarse dentro de un GrowProvider');
+  return context;
+};
+
+/** Operaciones sobre el cultivo. Referencias estables: no provocan re-render. */
+export const useGrowActions = (): GrowActions => {
+  const context = useContext(GrowActionsContext);
+  if (!context) throw new Error('useGrowActions debe usarse dentro de un GrowProvider');
   return context;
 };

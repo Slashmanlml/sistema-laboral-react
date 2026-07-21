@@ -1,6 +1,9 @@
 /**
- * Perfiles de cronograma de riego con sales Ryanodine (Fibra de Coco) para GrowManager.
+ * Perfiles de cronograma de riego para GrowManager.
+ * Incluye las líneas Ryanodine (fibra de coco), Athena Pro y Athena Blended.
  */
+
+import type { LotStage, NutrientLine } from '../types/grow';
 
 export interface ScheduleWeek {
   week: number;
@@ -462,3 +465,113 @@ export const ATHENA_BLENDED_FLOWER_SCHEDULE: ScheduleWeek[] = [
     notes: 'Lavado final de sales acumuladas. Último empuje de resina sin nitrógeno.'
   }
 ];
+
+// =============================================================================
+// Selección y formateo de cronogramas
+//
+// Antes esta lógica estaba duplicada en GrowContext, irrigationEngine y LogsView,
+// lo que hacía que el modal de dosificación mostrara siempre recetas Ryanodine
+// aunque el usuario tuviera Athena seleccionado.
+// =============================================================================
+
+const SCHEDULES: Record<NutrientLine, { veg: ScheduleWeek[]; flower: ScheduleWeek[] }> = {
+  ryanodine: { veg: VEG_SCHEDULE, flower: FLOWER_SCHEDULE },
+  athena_pro: { veg: ATHENA_PRO_VEG_SCHEDULE, flower: ATHENA_PRO_FLOWER_SCHEDULE },
+  athena_blended: { veg: ATHENA_BLENDED_VEG_SCHEDULE, flower: ATHENA_BLENDED_FLOWER_SCHEDULE },
+};
+
+/**
+ * Devuelve el cronograma semanal correspondiente a una etapa y línea de nutrientes.
+ * Para etapas sin fertilización programada (germinación, secado, curado) devuelve
+ * un arreglo vacío.
+ */
+export const getSchedule = (stage: LotStage, line: NutrientLine): ScheduleWeek[] => {
+  if (stage === 'Vegetativo') return SCHEDULES[line].veg;
+  if (stage === 'Floración') return SCHEDULES[line].flower;
+  return [];
+};
+
+/**
+ * Busca los datos de una semana dentro de un cronograma. Si el cultivo superó la
+ * última semana definida, devuelve la última (mantiene la receta de finalización).
+ */
+export const findScheduleWeek = (
+  schedule: ScheduleWeek[],
+  weekNum: number
+): ScheduleWeek | undefined => {
+  if (schedule.length === 0) return undefined;
+  return schedule.find(s => s.week === weekNum) ?? schedule[schedule.length - 1];
+};
+
+/** Nombre comercial de cada línea, para mostrar en la UI. */
+export const NUTRIENT_LINE_LABELS: Record<NutrientLine, string> = {
+  ryanodine: 'Ryanodine',
+  athena_pro: 'Athena Pro',
+  athena_blended: 'Athena Blended',
+};
+
+export interface TankDoseRow {
+  label: string;
+  amount: string;
+  unit: string;
+}
+
+/**
+ * Calcula la cantidad de cada componente para un tanque de `liters` litros.
+ *
+ * Cada línea expresa sus dosis en unidades distintas: Ryanodine en ml/L y las
+ * Athena en g/10L o mL/10L. La calculadora anterior multiplicaba siempre por
+ * litros, así que con Athena daba diez veces de más.
+ */
+export const calculateTankDose = (
+  week: ScheduleWeek,
+  line: NutrientLine,
+  liters: number
+): TankDoseRow[] => {
+  const per10L = liters / 10;
+
+  if (line === 'athena_pro') {
+    const isFade = week.week === 8;
+    return [
+      { label: 'Pro Bloom', amount: (week.makroA * per10L).toFixed(1), unit: 'g' },
+      {
+        label: isFade ? 'Fade' : 'Pro Core',
+        amount: (week.mikroB * per10L).toFixed(1),
+        unit: isFade ? 'mL' : 'g',
+      },
+      { label: 'Cleanse', amount: (week.calcisC * per10L).toFixed(1), unit: 'mL' },
+    ];
+  }
+
+  if (line === 'athena_blended') {
+    const base = week.title.toLowerCase().includes('veg') ? 'Grow A & B' : 'Bloom A & B';
+    return [
+      { label: base, amount: (week.makroA * per10L).toFixed(1), unit: 'mL' },
+      { label: 'CaMg / PK', amount: (week.calcisC * per10L).toFixed(1), unit: 'mL' },
+      { label: 'Cleanse', amount: (0.8 * liters).toFixed(1), unit: 'mL' },
+    ];
+  }
+
+  return [
+    { label: 'Makro A (Base)', amount: (week.makroA * liters).toFixed(1), unit: 'ml' },
+    { label: 'Mikro B + Calcis C', amount: (week.mikroB * liters).toFixed(1), unit: 'ml' },
+  ];
+};
+
+/** Texto de dosificación de una semana según la línea de nutrientes activa. */
+export const formatDose = (week: ScheduleWeek, line: NutrientLine): string => {
+  if (line === 'athena_pro') {
+    // En la semana 8 el Pro Core se reemplaza por Fade (líquido).
+    const isFade = week.week === 8;
+    const secondPart = isFade ? 'Fade' : 'Pro Core';
+    const secondUnit = isFade ? 'mL' : 'g';
+    return `Pro Bloom: ${week.makroA} g/10L, ${secondPart}: ${week.mikroB} ${secondUnit}/10L, Cleanse: ${week.calcisC} mL/10L`;
+  }
+
+  if (line === 'athena_blended') {
+    const base = week.title.toLowerCase().includes('veg') ? 'Grow A & B' : 'Bloom A & B';
+    return `${base}: ${week.makroA} mL/10L, CaMg / PK: ${week.calcisC} mL/10L, Cleanse: 0.8 mL/L`;
+  }
+
+  return `A: ${week.makroA} ml/L, B: ${week.mikroB} ml/L, C: ${week.calcisC} ml/L`;
+};

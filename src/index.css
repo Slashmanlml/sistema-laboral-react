@@ -1,5 +1,7 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+﻿/* La fuente Inter se carga desde index.html con preconnect: un @import acá
+   bloquea el render hasta que baja la hoja de estilos de Google. */
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* ═══════════════════════════════════════════════
    GROWMANAGER — SISTEMA DE DISEÑO BIOPHILIC LIGHT

@@ -2,11 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Sprout, Lock, Mail, AlertCircle, Eye, EyeOff, Shield } from 'lucide-react';
 
-interface LoginViewProps {
-  onLoginSuccess?: () => void;
-}
-
-export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
+export const LoginView = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,8 +20,7 @@ export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
       if (authError) throw authError;
-
-      if (onLoginSuccess) onLoginSuccess();
+      // El cambio de sesión lo detecta `onAuthStateChange` en App.tsx.
     } catch (err: unknown) {
       console.error('Error de autenticación:', err);
       const errorMsg = err instanceof Error ? err.message : 'Ocurrió un error al iniciar sesión.';
@@ -99,6 +94,7 @@ export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
         {/* Error Message */}
         {error && (
           <div
+            role="alert"
             className="p-4 mb-5 flex items-start gap-3 animate-fade-in"
             style={{
               background: '#fef2f2',
@@ -171,6 +167,7 @@ export const LoginView = ({ onLoginSuccess }: LoginViewProps) => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 className="absolute inset-y-0 right-0 pr-4 flex items-center transition"
                 style={{ color: '#94a3b8' }}
               >

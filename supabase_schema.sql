@@ -18,7 +18,8 @@ create table lots (
   name text not null,
   strain text not null,
   plant_count integer not null,
-  stage text not null check (stage in ('Cama 1 y 2 (Propagación)', 'Cama 3 (Preflora Temprana)', 'Cama 4 (Preflora Avanzada)', 'Cama 5 (Madres)', 'Cama 6 (Pre-flora)', 'Floración', 'Secado', 'Curado')),
+  -- Debe coincidir con LOT_STAGES en src/types/grow.ts
+  stage text not null check (stage in ('Germinación', 'Vegetativo', 'Floración', 'Secado', 'Curado')),
   start_date date not null,
   notes text,
   is_archived boolean not null default false
@@ -92,7 +93,25 @@ create policy "Acceso privado helpers" on helpers for all to authenticated using
 
 -- 2. Agregar la columna watered_by a la tabla logs
 alter table logs add column watered_by text;
+
+-- 3. Corregir el CHECK de etapas de los lotes.
+--    Las bases creadas antes de esta corrección tienen una lista de etapas que
+--    no coincide con la aplicación, por lo que TODO insert de lote falla.
+alter table lots drop constraint if exists lots_stage_check;
+alter table lots add constraint lots_stage_check
+  check (stage in ('Germinación', 'Vegetativo', 'Floración', 'Secado', 'Curado'));
 */
+
+
+-- =========================================================================
+-- ÍNDICES RECOMENDADOS
+-- Las consultas siempre filtran por usuario y ordenan por fecha.
+-- =========================================================================
+create index if not exists logs_user_date_idx on logs (user_id, date desc);
+create index if not exists logs_lot_idx on logs (lot_id);
+create index if not exists tasks_user_date_idx on tasks (user_id, date);
+create index if not exists tasks_lot_idx on tasks (lot_id);
+create index if not exists lots_user_idx on lots (user_id);
 
 
 

@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { calculateVPD, getVPDInfo, calculateDaysElapsed } from './calculations';
+import { calculateVPD, getVPDInfo, calculateDaysElapsed, getCycleWeek } from './calculations';
+import { todayStr, addDaysToStr } from './date';
 
 describe('Cálculos Científicos de Cultivo', () => {
   test('Debe calcular VPD correctamente según temperatura y humedad', () => {
@@ -21,9 +22,23 @@ describe('Cálculos Científicos de Cultivo', () => {
   });
 
   test('Debe calcular la cantidad de días transcurridos desde una fecha', () => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const days = calculateDaysElapsed(todayStr);
-    expect(days).toBeGreaterThanOrEqual(0);
-    expect(days).toBeLessThan(2);
+    // Usar todayStr() y no `toISOString().split('T')[0]`: el segundo devuelve la
+    // fecha UTC, que a la noche en Argentina ya es el día siguiente.
+    expect(calculateDaysElapsed(todayStr())).toBe(0);
+    expect(calculateDaysElapsed(addDaysToStr(todayStr(), -10))).toBe(10);
+  });
+
+  test('Debe devolver días negativos si el lote todavía no arrancó', () => {
+    expect(calculateDaysElapsed(addDaysToStr(todayStr(), 3))).toBe(-3);
+  });
+
+  test('getCycleWeek: vegetativo arranca en semana 0 y floración en semana 1', () => {
+    const start = addDaysToStr(todayStr(), -10); // 10 días → semana 1 cruda
+
+    expect(getCycleWeek({ stage: 'Vegetativo', start_date: start })).toBe(1);
+    // Floración corre un lugar: la primera semana ya tiene receta propia.
+    expect(getCycleWeek({ stage: 'Floración', start_date: start })).toBe(2);
+    // Un lote recién iniciado en floración nunca cae por debajo de la semana 1.
+    expect(getCycleWeek({ stage: 'Floración', start_date: todayStr() })).toBe(1);
   });
 });

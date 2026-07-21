@@ -2,6 +2,9 @@
  * Cálculos científicos para GrowManager.
  */
 
+import type { Lot, LotStage, NutrientLine } from '../types/grow';
+import { daysBetween, todayStr } from './date';
+
 export interface VPDInfo {
   statusClass: string;
   label: string;
@@ -56,13 +59,30 @@ export const getVPDInfo = (vpd: number): VPDInfo => {
   }
 };
 
-export const calculateDaysElapsed = (startDateStr: string): number => {
-  const start = new Date(startDateStr + 'T00:00:00');
-  const now = new Date();
-  start.setHours(0, 0, 0, 0);
-  now.setHours(0, 0, 0, 0);
-  const diffTime = Math.abs(now.getTime() - start.getTime());
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+/**
+ * Días transcurridos desde el inicio del lote hasta `referenceDateStr` (hoy por
+ * defecto). Puede ser negativo si el lote todavía no arrancó.
+ */
+export const calculateDaysElapsed = (
+  startDateStr: string,
+  referenceDateStr: string = todayStr()
+): number => daysBetween(startDateStr, referenceDateStr);
+
+/**
+ * Semana del ciclo en la que está el lote.
+ *
+ * Vegetativo arranca en la semana 0 (enraizamiento); floración arranca en la
+ * semana 1, porque la primera semana de flora ya tiene receta propia.
+ *
+ * Esta lógica estaba duplicada en cuatro lugares (LogsView, DashboardView y dos
+ * veces en irrigationEngine); cualquier ajuste al criterio se hace acá.
+ */
+export const getCycleWeek = (
+  lot: Pick<Lot, 'stage' | 'start_date'>,
+  referenceDateStr: string = todayStr()
+): number => {
+  const rawWeek = Math.floor(calculateDaysElapsed(lot.start_date, referenceDateStr) / 7);
+  return lot.stage === 'Floración' ? Math.max(rawWeek + 1, 1) : rawWeek;
 };
 
 export interface ClimateTargets {
@@ -76,7 +96,7 @@ export interface ClimateTargets {
   notes: string;
 }
 
-export const getAthenaClimateTargets = (stage: string, week: number): ClimateTargets => {
+export const getAthenaClimateTargets = (stage: LotStage, week: number): ClimateTargets => {
   if (stage === 'Vegetativo') {
     return {
       minTemp: 22.2,
@@ -148,7 +168,11 @@ export interface RunoffTargets {
   waterVolume: string;
 }
 
-export const getAthenaRunoffTargets = (stage: string, week: number, line: string): RunoffTargets => {
+export const getAthenaRunoffTargets = (
+  stage: LotStage,
+  week: number,
+  line: NutrientLine
+): RunoffTargets => {
   const isPro = line === 'athena_pro';
   if (stage === 'Vegetativo') {
     return {

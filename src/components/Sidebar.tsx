@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Box, Thermometer, CalendarCheck, Settings, Sprout, X, LogOut, BarChart3, Wifi, WifiOff, AlertCircle } from 'lucide-react';
 import { useGrow } from '../context/GrowContext';
 import { calculateDaysElapsed } from '../utils/calculations';
+import { todayStr } from '../utils/date';
 import { supabase } from '../lib/supabaseClient';
 
 interface SidebarProps {
@@ -11,15 +12,17 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
-  const { lots, tasks, dbStatus } = useGrow();
+  const { activeLots, tasks, dbStatus } = useGrow();
   const location = useLocation();
 
-  const activeLots = lots.filter(l => !l.is_archived);
-  const latestLot = [...activeLots].sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+  const latestLot = useMemo(
+    () => [...activeLots].sort((a, b) => b.start_date.localeCompare(a.start_date))[0],
+    [activeLots]
+  );
 
   // Badge de tareas pendientes hoy
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayPendingCount = tasks.filter(t => t.date === todayStr && !t.is_completed).length;
+  const today = todayStr();
+  const todayPendingCount = tasks.filter(t => t.date === today && !t.is_completed).length;
 
   // Indicador de estado de DB
   const dbIndicator = {
@@ -68,7 +71,9 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Cerrar menú"
             className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white md:hidden transition"
           >
             <X size={16} />
